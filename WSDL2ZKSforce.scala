@@ -5,9 +5,24 @@ class TypeInfo(xmlName: String, objcName: String, propertyFlags: String) {
 	var xmlTypeName: String = xmlName
 	var objcTypeName: String = objcName
 	var objcPropFlags: String = propertyFlags
+	
+	def propertyDeclComment(): String =  { "" }
 }
 
 class ComplexTypeInfo(xmlName: String) extends TypeInfo(xmlName, "ZK" + xmlName.capitalize, "retain") {
+}
+
+class ArrayTypeInfo(ct: TypeInfo) extends TypeInfo(ct.xmlTypeName, "NSArray *", "retain") {
+	val componentType = ct
+
+	override def propertyDeclComment(): String =  { " // of " + componentType.objcTypeName }
+}
+
+class ComplexTypeProperty(name: String, propType: TypeInfo) {
+	
+	def readonlyPropertyDecl() :String = {
+		"@property (" + propType.objcPropFlags + ") " + propType.objcTypeName + " " + name + ";" + propType.propertyDeclComment
+	}
 }
 
 object WSDL2ZKSforce {
@@ -51,8 +66,10 @@ object WSDL2ZKSforce {
 		val array = (max != "" && max != "1")
 		val xmlt = (field \ "@type").text
 		val name = (field \ "@name").text
-		val t = if (array) new TypeInfo(xmlt, "NSArray *", "retain") else types.getOrElse(xmlt, new ComplexTypeInfo(name))
-		h.println("@property (" + t.objcPropFlags + ") " + t.objcTypeName + " " + name + ";")
+		val singleType = types.getOrElse(xmlt, new ComplexTypeInfo(name))
+		val t = if (array) new ArrayTypeInfo(singleType) else singleType
+		val prop = new ComplexTypeProperty(name, t)
+		h.println(prop.readonlyPropertyDecl)
 	}
 }
 
