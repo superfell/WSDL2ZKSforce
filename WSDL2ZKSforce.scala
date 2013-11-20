@@ -13,8 +13,11 @@ class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.
 
 class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 	
-	def readonlyPropertyDecl() :String = {
-		"@property (" + propType.propertyFlags + ") " + propType.objcName + " " + name + ";" + propType.propertyDeclComment
+	def propertyDecl(readOnly: Boolean): String = {
+		val f = if (readOnly) "readonly" else propType.propertyFlags
+		val t = propType.objcName
+		val comment = propType.propertyDeclComment
+		s"@property ($f) $t $name; $comment"
 	}
 }
 
@@ -27,20 +30,24 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 	val direction =  Direction.ValueSet.newBuilder
 		
 	def writeHeaderFile() {
+		val dir = direction.result()
+		val deserializer = dir.contains (Direction.Deserialize)
+		if (dir.contains(Direction.Deserialize) && dir.contains(Direction.Serialize))
+			throw new RuntimeException("complexType with both serialization & deserialization not supported")
+
 		val hfile = new File(new File("output"), objcName + ".h")
 		hfile.getParentFile().mkdirs()
 		val h = new PrintWriter(hfile)
-		val dir = direction.result()
 		writeComment(h)
-		val importFile = if (dir.contains (Direction.Deserialize)) "zkDeserializer.h" else "ZKXMLSerializable.h"
-		val baseClass  = if (dir.contains (Direction.Deserialize)) "ZKXMLDeserializer" else "NSObject<XMLSerializable>"
+		val importFile = if (deserializer) "zkDeserializer.h" else "ZKXMLSerializable.h"
+		val baseClass  = if (deserializer) "ZKXMLDeserializer" else "NSObject<XMLSerializable>"
 		h.println((s"""#import $importFile
 					|
 					|@interface $objcName : $baseClass {
 					|}
 					""").stripMargin('|'))
 		for (f <- fields)
-			h.println(f.readonlyPropertyDecl)
+			h.println(f.propertyDecl(deserializer))
 		h.println("@end")
 		h.close()
 	}
