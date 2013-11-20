@@ -1,4 +1,5 @@
 import scala.xml._
+import java.io._
 
 class TypeInfo(xmlName: String, objcName: String, propertyFlags: String) {
 	var xmlTypeName: String = xmlName
@@ -26,14 +27,14 @@ object WSDL2ZKSforce {
 		val objName:String = "ZK" + xmlName
 		val t = new TypeInfo(xmlName, objName, "retain")
 		
-		val header = ("""#import "zkDeserializer.h"
+		val h = new PrintWriter(new File(objName + ".h"))
+		h.print(("""#import "zkDeserializer.h"
 		|@interface """ + objName + """ : ZKXMLDeserializer {
 		|}
 		|
 		|@end
-		|""").stripMargin('|')
-		
-		println(header)
+		|""").stripMargin('|'))
+		h.close()
 	}
 }
 
