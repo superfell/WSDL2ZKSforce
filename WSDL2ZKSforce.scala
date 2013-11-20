@@ -1,10 +1,7 @@
 import scala.xml._
 import java.io._
 
-class TypeInfo(xmlName: String, objcName: String, propertyFlags: String) {
-	var xmlTypeName: String = xmlName
-	var objcTypeName: String = objcName
-	var objcPropFlags: String = propertyFlags
+class TypeInfo(val xmlName: String, val objcName: String, val propertyFlags: String) {
 	
 	def propertyDeclComment(): String =  { "" }
 }
@@ -12,26 +9,25 @@ class TypeInfo(xmlName: String, objcName: String, propertyFlags: String) {
 class ComplexTypeInfo(xmlName: String) extends TypeInfo(xmlName, "ZK" + xmlName.capitalize, "retain") {
 }
 
-class ArrayTypeInfo(ct: TypeInfo) extends TypeInfo(ct.xmlTypeName, "NSArray *", "retain") {
-	val componentType = ct
+class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.xmlName, "NSArray *", "retain") {
 
-	override def propertyDeclComment(): String =  { " // of " + componentType.objcTypeName }
+	override def propertyDeclComment(): String =  { " // of " + componentType.objcName }
 }
 
-class ComplexTypeProperty(name: String, propType: TypeInfo) {
+class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 	
 	def readonlyPropertyDecl() :String = {
-		"@property (" + propType.objcPropFlags + ") " + propType.objcTypeName + " " + name + ";" + propType.propertyDeclComment
+		"@property (" + propType.propertyFlags + ") " + propType.objcName + " " + name + ";" + propType.propertyDeclComment
 	}
 }
 
 object WSDL2ZKSforce {
 	def main(args: Array[String]) {
 		val types = Map(
-					"xsd:string" -> new TypeInfo("string", 	"NSString *", "retain"),
-					   "xsd:int" -> new TypeInfo("int",    	"NSInteger",  "assign"),
-					"xsd:boolean"-> new TypeInfo("boolean", "BOOL", 	  "assign"),
-					"tns:ID"	 -> new TypeInfo("ID",		"NSString *", "retain")
+					"string" -> new TypeInfo("string", 	"NSString *", "retain"),
+					"int" 	 -> new TypeInfo("int",    	"NSInteger",  "assign"),
+					"boolean"-> new TypeInfo("boolean", "BOOL", 	  "assign"),
+					"ID"	 -> new TypeInfo("ID",		"NSString *", "retain")
 					)
 					
 		val wsdl = XML.loadFile("./partner.wsdl")
@@ -64,12 +60,18 @@ object WSDL2ZKSforce {
 	def generateField(h: PrintWriter, field: Node, types: Map[String, TypeInfo]) {
 		val max = (field \ "@maxOccurs").text
 		val array = (max != "" && max != "1")
-		val xmlt = (field \ "@type").text
+		val xmlt = elementType(field)
 		val name = (field \ "@name").text
-		val singleType = types.getOrElse(xmlt, new ComplexTypeInfo(name))
+		val singleType = types.getOrElse(xmlt, new ComplexTypeInfo(xmlt))
 		val t = if (array) new ArrayTypeInfo(singleType) else singleType
 		val prop = new ComplexTypeProperty(name, t)
 		h.println(prop.readonlyPropertyDecl)
+	}
+	
+	def elementType(e: Node): String = {
+		val t = (e \ "@type").text
+		val c = t.indexOf(':')
+		if (c == -1) t else t.substring(c+1)
 	}
 }
 
