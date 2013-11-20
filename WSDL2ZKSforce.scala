@@ -27,12 +27,16 @@
 import scala.xml._
 import java.io._
 
-class TypeInfo(val xmlName: String, val objcName: String, val propertyFlags: String) {
+class TypeInfo(val xmlName: String, val objcName: String, val isPointer: Boolean) {
 	
 	def propertyDeclComment(): String =  { "" }
+	
+	def propertyFlags(): String = { if (isPointer) "retain" else "assign" }
+	
+	def fullTypeName(): String = { if (isPointer) objcName + " *" else objcName }
 }
 
-class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.xmlName, "NSArray *", "retain") {
+class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.xmlName, "NSArray", true) {
 
 	override def propertyDeclComment(): String =  { " // of " + componentType.objcName }
 }
@@ -52,8 +56,9 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 	}
 	
 	private def typeDef(padTypeTo: Int): String = {
-		val t = propType.objcName.padTo(padTypeTo, ' ')
-		s"$t$name"
+		val t = propType.objcName.padTo(padTypeTo - (if (propType.isPointer) 1 else 0), ' ')
+		val p = if (propType.isPointer) "*" else ""
+		s"$t$p$name"
 	}
 }
 
@@ -61,7 +66,7 @@ object Direction extends Enumeration {
 	val Serialize, Deserialize = Value
 }
 
-class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, "ZK" + xmlName.capitalize, "retain") {
+class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, "ZK" + xmlName.capitalize, true) {
 	
 	val direction =  Direction.ValueSet.newBuilder
 
@@ -84,7 +89,7 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 		h.println(s"""#import $importFile
 					|
 					|@interface $objcName : $baseClass {""".stripMargin('|'));
-		val padTo = if (fields.length == 0) 0 else fields.map(_.propType.objcName.length).max
+		val padTo = if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max
 		if (!deserializer)
 			for (f <- fields)
 				h.println(f.ivarDecl(padTo))
@@ -229,14 +234,14 @@ def stripPrefix(v: String): String = {
 object WSDL2ZKSforce {
 	def main(args: Array[String]) {
 		val types = Map(
-					"string" 		-> new TypeInfo("string", 		"NSString *", 	"retain"),
-					"int" 	 		-> new TypeInfo("int",    		"NSInteger",  	"assign"),
-					"boolean"		-> new TypeInfo("boolean", 		"BOOL", 	  	"assign"),
-					"ID"	 		-> new TypeInfo("ID",			"NSString *", 	"retain"),
-					"sObject"		-> new TypeInfo("sObject", 		"ZKSObject *",	"retain"),
-					"dateTime"		-> new TypeInfo("dateTime",		"NSDate *",  	"retain"),
-					"date"   		-> new TypeInfo("date",    		"NSDate *",   	"retain"),
-					"base64Binary" 	-> new TypeInfo("base64Binary", "NSData *", 	"retain")
+					"string" 		-> new TypeInfo("string", 		"NSString",  true),
+					"int" 	 		-> new TypeInfo("int",    		"NSInteger", false),
+					"boolean"		-> new TypeInfo("boolean", 		"BOOL", 	 false),
+					"ID"	 		-> new TypeInfo("ID",			"NSString",  true),
+					"sObject"		-> new TypeInfo("sObject", 		"ZKSObject", true),
+					"dateTime"		-> new TypeInfo("dateTime",		"NSDate",  	 true),
+					"date"   		-> new TypeInfo("date",    		"NSDate",    true),
+					"base64Binary" 	-> new TypeInfo("base64Binary", "NSData", 	 true)
 					)
 					
 		val wsdl = XML.loadFile("./partner.wsdl")
