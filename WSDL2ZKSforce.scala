@@ -39,20 +39,21 @@ class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.
 
 class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 	
-	def propertyDecl(readOnly: Boolean): String = {
+	def propertyDecl(padTypeTo: Int, readOnly: Boolean): String = {
 		val f = if (readOnly) "readonly" else propType.propertyFlags
 		val comment = propType.propertyDeclComment
-		s"@property ($f) $typeDef; $comment"
+		val td = typeDef(padTypeTo)
+		s"@property ($f) $td; $comment"
 	}
 	
-	def ivarDecl(): String = {
-		s"\t$typeDef;"
+	def ivarDecl(padTypeTo: Int): String = {
+		val td = typeDef(padTypeTo)
+		s"\t$td;"
 	}
 	
-	private def typeDef(): String = {
-		val t = propType.objcName
-		val pad = if (t.endsWith("*")) "" else " "
-		s"$t$pad$name"
+	private def typeDef(padTypeTo: Int): String = {
+		val t = propType.objcName.padTo(padTypeTo, ' ')
+		s"$t$name"
 	}
 }
 
@@ -83,12 +84,13 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 		h.println(s"""#import $importFile
 					|
 					|@interface $objcName : $baseClass {""".stripMargin('|'));
+		val padTo = if (fields.length == 0) 0 else fields.map(_.propType.objcName.length).max
 		if (!deserializer)
 			for (f <- fields)
-				h.println(f.ivarDecl)
+				h.println(f.ivarDecl(padTo))
 		h.println("}")
 		for (f <- fields)
-			h.println(f.propertyDecl(deserializer))
+			h.println(f.propertyDecl(padTo, deserializer))
 		h.println("@end")
 		h.close()
 	}
