@@ -41,9 +41,18 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 	
 	def propertyDecl(readOnly: Boolean): String = {
 		val f = if (readOnly) "readonly" else propType.propertyFlags
-		val t = propType.objcName
 		val comment = propType.propertyDeclComment
-		s"@property ($f) $t $name; $comment"
+		s"@property ($f) $typeDef; $comment"
+	}
+	
+	def ivarDecl(): String = {
+		s"\t$typeDef;"
+	}
+	
+	private def typeDef(): String = {
+		val t = propType.objcName
+		val pad = if (t.endsWith("*")) "" else " "
+		s"$t$pad$name"
 	}
 }
 
@@ -54,12 +63,16 @@ object Direction extends Enumeration {
 class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, "ZK" + xmlName.capitalize, "retain") {
 	
 	val direction =  Direction.ValueSet.newBuilder
-		
-	def writeHeaderFile() {
+
+	private def validate() {
 		val dir = direction.result()
-		val deserializer = dir.contains (Direction.Deserialize)
 		if (dir.contains(Direction.Deserialize) && dir.contains(Direction.Serialize))
 			throw new RuntimeException("complexType with both serialization & deserialization not supported")
+	}
+	
+	def writeHeaderFile() {
+		validate()
+		val deserializer = direction.result().contains (Direction.Deserialize)
 
 		val hfile = new File(new File("output"), objcName + ".h")
 		hfile.getParentFile().mkdirs()
@@ -67,11 +80,13 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 		writeComment(h)
 		val importFile = if (deserializer) "zkDeserializer.h" else "ZKXMLSerializable.h"
 		val baseClass  = if (deserializer) "ZKXMLDeserializer" else "NSObject<XMLSerializable>"
-		h.println((s"""#import $importFile
+		h.println(s"""#import $importFile
 					|
-					|@interface $objcName : $baseClass {
-					|}
-					""").stripMargin('|'))
+					|@interface $objcName : $baseClass {""".stripMargin('|'));
+		if (!deserializer)
+			for (f <- fields)
+				h.println(f.ivarDecl)
+		h.println("}")
 		for (f <- fields)
 			h.println(f.propertyDecl(deserializer))
 		h.println("@end")
