@@ -31,9 +31,12 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 		hfile.getParentFile().mkdirs()
 		val h = new PrintWriter(hfile)
 		val dir = direction.result()
-		writeComment(h);
-		h.println(("""#import "zkDeserializer.h"
-					|@interface """ + objcName + """ : ZKXMLDeserializer {
+		writeComment(h)
+		val importFile = if (dir.contains (Direction.Deserialize)) "zkDeserializer.h" else "ZKXMLSerializable.h"
+		val baseClass  = if (dir.contains (Direction.Deserialize)) "ZKXMLDeserializer" else "NSObject<XMLSerializable>"
+		h.println((s"""#import $importFile
+					|
+					|@interface $objcName : $baseClass {
 					|}
 					""").stripMargin('|'))
 		for (f <- fields)
@@ -62,7 +65,8 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 		/// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
 		/// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
 		/// THE SOFTWARE.
-		///""".stripMargin('/'));
+		///
+		/""".stripMargin('/'));
 	}
 }
 
