@@ -27,21 +27,39 @@
 import scala.xml._
 import java.io._
 
-class TypeInfo(val xmlName: String, val objcName: String, val isPointer: Boolean) {
+class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val isPointer: Boolean) {
 	
 	def propertyDeclComment(): String =  { "" }
 	
 	def propertyFlags(): String = { if (isPointer) "retain" else "assign" }
 	
 	def fullTypeName(): String = { if (isPointer) objcName + " *" else objcName }
+	
+	def accessor(elemName: String): String = {
+		s"""[self $accessor:@"$elemName"]"""
+	}
 }
 
-class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.xmlName, "NSArray", true) {
+class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.xmlName, "NSArray", "", true) {
 
 	override def propertyDeclComment(): String =  { " // of " + componentType.objcName }
+	
+	override def accessor(elemName: String): String = {
+		if (componentType.objcName == "NSString")
+			s"""[self strings:@"$elemName"]"""
+		else
+			s"""[self complexTypeArrayFromElements:@"$elemName" cls:[${componentType.objcName} class]]"""
+	}
 }
 
 class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
+	
+	def implBody(deserializer: Boolean): String =  {
+		s"""-(${propType.fullTypeName})$name {
+			|    return ${propType.accessor(name)};
+			|}
+			""".stripMargin('|')
+	}
 	
 	def propertyDecl(padTypeTo: Int, readOnly: Boolean): String = {
 		val f = if (readOnly) "readonly" else propType.propertyFlags
@@ -66,7 +84,7 @@ object Direction extends Enumeration {
 	val Serialize, Deserialize = Value
 }
 
-class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, "ZK" + xmlName.capitalize, true) {
+class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, "ZK" + xmlName.capitalize, "", true) {
 	
 	val direction =  Direction.ValueSet.newBuilder
 
@@ -74,6 +92,10 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 		val dir = direction.result()
 		if (dir.contains(Direction.Deserialize) && dir.contains(Direction.Serialize))
 			throw new RuntimeException("complexType with both serialization & deserialization not supported")
+	}
+	
+	override def accessor(elemName: String): String = {
+		s"""[[self complexTypeArrayFromElements:@"$elemName" cls:[${objcName} class]] lastObject]"""
 	}
 	
 	def writeHeaderFile() {
@@ -86,7 +108,7 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 		writeComment(h)
 		val importFile = if (deserializer) "zkDeserializer.h" else "ZKXMLSerializable.h"
 		val baseClass  = if (deserializer) "ZKXMLDeserializer" else "NSObject<XMLSerializable>"
-		h.println(s"""#import $importFile
+		h.println(s"""#import "$importFile"
 					|
 					|@interface $objcName : $baseClass {""".stripMargin('|'));
 		val padTo = if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max
@@ -98,6 +120,23 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 			h.println(f.propertyDecl(padTo, deserializer))
 		h.println("@end")
 		h.close()
+	}
+	
+	def writeImplFile() {
+		val deserializer = direction.result().contains (Direction.Deserialize)
+		val ifile = new File(new File("output"), objcName + ".m")
+		val w = new PrintWriter(ifile)
+		writeComment(w)
+		w.println(s"""#import "$objcName.h"
+			|
+			|@implementation $objcName
+			|""".stripMargin('|'))
+	
+		for (f <- fields)
+			w.println(f.implBody(deserializer))
+			
+		w.println("@end")
+		w.close()
 	}
 	
 	private def writeComment(w: PrintWriter) {
@@ -155,8 +194,10 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	}
 	
 	def writeTypes() {
-		for ((_, ct) <- complexTypes)
+		for ((_, ct) <- complexTypes) {
 			ct.writeHeaderFile()
+			ct.writeImplFile()
+		}
 	}
 
 	private def createSimpleTypes(wsdl: Elem): Map[String, Node] = {
@@ -234,14 +275,14 @@ def stripPrefix(v: String): String = {
 object WSDL2ZKSforce {
 	def main(args: Array[String]) {
 		val types = Map(
-					"string" 		-> new TypeInfo("string", 		"NSString",  true),
-					"int" 	 		-> new TypeInfo("int",    		"NSInteger", false),
-					"boolean"		-> new TypeInfo("boolean", 		"BOOL", 	 false),
-					"ID"	 		-> new TypeInfo("ID",			"NSString",  true),
-					"sObject"		-> new TypeInfo("sObject", 		"ZKSObject", true),
-					"dateTime"		-> new TypeInfo("dateTime",		"NSDate",  	 true),
-					"date"   		-> new TypeInfo("date",    		"NSDate",    true),
-					"base64Binary" 	-> new TypeInfo("base64Binary", "NSData", 	 true)
+					"string" 		-> new TypeInfo("string", 		"NSString",  "string",  true),
+					"int" 	 		-> new TypeInfo("int",    		"NSInteger", "integer", false),
+					"boolean"		-> new TypeInfo("boolean", 		"BOOL", 	 "boolean", false),
+					"ID"	 		-> new TypeInfo("ID",			"NSString",  "string",  true),
+					"sObject"		-> new TypeInfo("sObject", 		"ZKSObject", "sObject",  true),
+					"dateTime"		-> new TypeInfo("dateTime",		"NSDate",  	 "dateTime", true),
+					"date"   		-> new TypeInfo("date",    		"NSDate",    "date",     true),
+					"base64Binary" 	-> new TypeInfo("base64Binary", "NSData", 	 "blob",     true)
 					)
 					
 		val wsdl = XML.loadFile("./partner.wsdl")
