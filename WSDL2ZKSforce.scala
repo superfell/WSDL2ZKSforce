@@ -207,8 +207,8 @@ class InputComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) ex
 // A ComplexType from a message output, i.e. something we'll need to be able to deserialize
 class OutputComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, fields) {
 	
-	override def headerImportFile(): String = { "zkDeserializer.h" }
-	override def baseClass(): String = { "ZKXMLDeserializer" }
+	override def headerImportFile(): String = { "zkXmlDeserializer.h" }
+	override def baseClass(): String = { "ZKXmlDeserializer" }
 	
 	override protected def writeImplFileBody(w: PrintWriter) {
 		for (f <- fields)
