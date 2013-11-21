@@ -125,7 +125,7 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 		h.println(pp.format(xmlNode))
 		h.println("*/")
 		h.println(s"@interface $objcName : ${baseClass} {");
-		val padTo = if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max
+		val padTo = if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max + 1
 		if (includeIVarDecl)
 			for (f <- fields)
 				h.println(f.ivarDecl(padTo))
