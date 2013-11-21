@@ -73,6 +73,10 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 		s"\t$td;"
 	}
 	
+	def serializeMethodName(): String = {
+		if (propType.objcName == "BOOL") "addBoolElement" else "addElement"
+	}
+	
 	private def typeDef(padTypeTo: Int): String = {
 		val t = propType.objcName.padTo(padTypeTo - (if (propType.isPointer) 1 else 0), ' ')
 		val p = if (propType.isPointer) "*" else ""
@@ -174,6 +178,10 @@ class InputComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) ex
 	override def includeIVarDecl(): Boolean = { true }
 	override def fieldsAreReadOnly(): Boolean = { false }
 	
+	private def addLength(f: ComplexTypeProperty): Int = {
+		f.name.length + f.serializeMethodName.length
+	}
+	
 	override protected def writeImplFileBody(w: PrintWriter) {
 		w.println("@synthesize " + fields.map(_.name).mkString(", ") + ";")
 		w.println()
@@ -184,9 +192,12 @@ class InputComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) ex
 		w.println("}")
 		w.println("-(void)serializeToEnvelope:(ZKEnvelope *)env elemName:(NSString *)elemName {")
 		w.println("\t[env startElement:elemName]")
+		val padTo = if (fields.length > 0) fields.map(addLength(_)).max else 0
 		for (f <- fields) {
-			val addMethod = if (f.propType.objcName == "BOOL") "addBoolElement" else "addElement"
-			w.println(s"""\t[env $addMethod:@"${f.name}" elemValue:self.${f.name}];""")
+			val addMethod = f.serializeMethodName
+			val pad = padTo - addMethod.length + 1
+			val name = (f.name + "\"").padTo(pad, ' ')
+			w.println(s"""\t[env $addMethod:@"$name elemValue:self.${f.name}];""")
 		}
 		w.println("\t[env endElement:elemName]")
 		w.println("}")
