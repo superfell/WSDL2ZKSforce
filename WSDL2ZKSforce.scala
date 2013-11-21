@@ -137,15 +137,18 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 	}
 	
 	protected def writeImplFileBody(w: PrintWriter) {} 
+	
+	protected def writeImports(w: PrintWriter) {}
 		
 	def writeImplFile() {
 		val ifile = new File(new File("output"), objcName + ".m")
 		val w = new PrintWriter(ifile)
 		writeComment(w)
-		w.println(s"""#import "$objcName.h"
-			|
-			|@implementation $objcName
-			|""".stripMargin('|'))
+		w.println(s"""#import "$objcName.h"""")
+		writeImports(w)
+		w.println()
+		w.println(s"@implementation $objcName")
+		w.println()
 
 		writeImplFileBody(w)
 			
@@ -217,6 +220,17 @@ class OutputComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexT
 	
 	override def headerImportFile(): String = { "zkXmlDeserializer.h" }
 	override def baseClass(): String = { "ZKXmlDeserializer" }
+	
+	override protected def writeImports(w: PrintWriter) {
+		for (f <- fields) {
+			val importStmt = f.propType match {
+				case a:ArrayTypeInfo => if (a.componentType.isGeneratedType) s"""#import "${a.componentType.objcName}.h"""" else ""
+				case t:TypeInfo      => if (t.isGeneratedType) s"""#import "${t.objcName}.h"""" else ""
+			}
+			if (importStmt.length > 0)
+				w.println(importStmt)
+		}
+	}
 	
 	override protected def writeImplFileBody(w: PrintWriter) {
 		for (f <- fields)
