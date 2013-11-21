@@ -88,7 +88,7 @@ object Direction extends Enumeration {
 	val Serialize, Deserialize = Value
 }
 
-class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, "ZK" + xmlName.capitalize, "", true) {
+class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, "ZK" + xmlName.capitalize, "", true) {
 	
 	val direction =  Direction.ValueSet.newBuilder
 
@@ -114,9 +114,13 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 		hfile.getParentFile().mkdirs()
 		val h = new PrintWriter(hfile)
 		writeComment(h)
-		h.println(s"""#import "${headerImportFile}"
-					|
-					|@interface $objcName : ${baseClass} {""".stripMargin('|'));
+		h.println(s"""#import "$headerImportFile"""")
+		h.println()
+		h.println("/*")
+		val pp = new PrettyPrinter(809, 2)
+		h.println(pp.format(xmlNode))
+		h.println("*/")
+		h.println(s"@interface $objcName : ${baseClass} {");
 		val padTo = if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max
 		if (includeIVarDecl)
 			for (f <- fields)
@@ -171,7 +175,7 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 }
 
 // A ComplexType from a message input, i.e. something we'll need to be able to serialize
-class InputComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, fields) {
+class InputComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, xmlNode, fields) {
 
 	override def headerImportFile(): String = { "ZKXMLSerializable.h" }
 	override def baseClass(): String = { "NSObject<XMLSerializable>" }
@@ -205,7 +209,7 @@ class InputComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) ex
 }
 
 // A ComplexType from a message output, i.e. something we'll need to be able to deserialize
-class OutputComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, fields) {
+class OutputComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, xmlNode, fields) {
 	
 	override def headerImportFile(): String = { "zkXmlDeserializer.h" }
 	override def baseClass(): String = { "ZKXmlDeserializer" }
@@ -288,9 +292,9 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	private def makeComplexType(xmlName: String, dir: Direction.Value): ComplexTypeInfo = {
 		val ct = complexTypeElems(xmlName)
 		// we insert a temporary version of the complexType to handle recursive definitions
-		complexTypes(xmlName) = new ComplexTypeInfo(xmlName, List())
+		complexTypes(xmlName) = new ComplexTypeInfo(xmlName, ct, List())
 		val fields = (ct \ "sequence" \ "element").map( x => generateField(x, dir) )
-		val i = if (dir == Direction.Serialize) new InputComplexTypeInfo(xmlName, fields) else new OutputComplexTypeInfo(xmlName, fields)
+		val i = if (dir == Direction.Serialize) new InputComplexTypeInfo(xmlName, ct, fields) else new OutputComplexTypeInfo(xmlName, ct, fields)
 		i.direction += dir
 		complexTypes(xmlName) = i
 		return i
