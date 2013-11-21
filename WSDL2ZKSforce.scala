@@ -35,6 +35,8 @@ class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val 
 	
 	def fullTypeName(): String = { if (isPointer) objcName + " *" else objcName }
 	
+	def isGeneratedType(): Boolean = { objcName.startsWith("ZK") }	// TODO
+	
 	def accessor(elemName: String): String = {
 		s"""[self $accessor:@"$elemName"]"""
 	}
@@ -116,6 +118,8 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 		writeComment(h)
 		h.println(s"""#import "$headerImportFile"""")
 		h.println()
+		for (f <- fields.filter(_.propType.isGeneratedType))
+			h.println(s"@class ${f.propType.objcName}")
 		h.println("/*")
 		val pp = new PrettyPrinter(809, 2)
 		h.println(pp.format(xmlNode))
