@@ -54,7 +54,7 @@ class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.
 
 class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 	
-	def implBody(deserializer: Boolean): String =  {
+	def readImplBody(): String =  {
 		s"""-(${propType.fullTypeName})$name {
 			|    return ${propType.accessor(name)};
 			|}
@@ -98,32 +98,35 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 		s"""[[self complexTypeArrayFromElements:@"$elemName" cls:[${objcName} class]] lastObject]"""
 	}
 	
+	def headerImportFile(): String = { "" }
+	def baseClass(): String = { "" }
+	def includeIVarDecl(): Boolean = { false }
+	def fieldsAreReadOnly(): Boolean = { true }
+	
 	def writeHeaderFile() {
 		validate()
-		val deserializer = direction.result().contains (Direction.Deserialize)
 
 		val hfile = new File(new File("output"), objcName + ".h")
 		hfile.getParentFile().mkdirs()
 		val h = new PrintWriter(hfile)
 		writeComment(h)
-		val importFile = if (deserializer) "zkDeserializer.h" else "ZKXMLSerializable.h"
-		val baseClass  = if (deserializer) "ZKXMLDeserializer" else "NSObject<XMLSerializable>"
-		h.println(s"""#import "$importFile"
+		h.println(s"""#import "${headerImportFile}"
 					|
-					|@interface $objcName : $baseClass {""".stripMargin('|'));
+					|@interface $objcName : ${baseClass} {""".stripMargin('|'));
 		val padTo = if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max
-		if (!deserializer)
+		if (includeIVarDecl)
 			for (f <- fields)
 				h.println(f.ivarDecl(padTo))
 		h.println("}")
 		for (f <- fields)
-			h.println(f.propertyDecl(padTo, deserializer))
+			h.println(f.propertyDecl(padTo, fieldsAreReadOnly))
 		h.println("@end")
 		h.close()
 	}
 	
+	protected def writeImplFileBody(w: PrintWriter) {} 
+		
 	def writeImplFile() {
-		val deserializer = direction.result().contains (Direction.Deserialize)
 		val ifile = new File(new File("output"), objcName + ".m")
 		val w = new PrintWriter(ifile)
 		writeComment(w)
@@ -131,9 +134,8 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 			|
 			|@implementation $objcName
 			|""".stripMargin('|'))
-	
-		for (f <- fields)
-			w.println(f.implBody(deserializer))
+
+		writeImplFileBody(w)
 			
 		w.println("@end")
 		w.close()
@@ -164,6 +166,44 @@ class ComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends
 	}
 }
 
+// A ComplexType from a message input, i.e. something we'll need to be able to serialize
+class InputComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, fields) {
+
+	override def headerImportFile(): String = { "ZKXMLSerializable.h" }
+	override def baseClass(): String = { "NSObject<XMLSerializable>" }
+	override def includeIVarDecl(): Boolean = { true }
+	override def fieldsAreReadOnly(): Boolean = { false }
+	
+	override protected def writeImplFileBody(w: PrintWriter) {
+		w.println("@synthesize " + fields.map(_.name).mkString(", ") + ";")
+		w.println()
+		w.println("-(void)dealloc {")
+		for (f <- fields.filter(_.propType.isPointer))
+			w.println(s"\t[${f.name} release];")
+		w.println("\t[super dealloc]")
+		w.println("}")
+		w.println("-(void)serializeToEnvelope:(ZKEnvelope *)env elemName:(NSString *)elemName {")
+		w.println("\t[env startElement:elemName]")
+		for (f <- fields) {
+			val addMethod = if (f.propType.objcName == "BOOL") "addBoolElement" else "addElement"
+			w.println(s"""\t[env $addMethod:@"${f.name}" elemValue:self.${f.name}];""")
+		}
+		w.println("\t[env endElement:elemName]")
+		w.println("}")
+	} 
+}
+
+// A ComplexType from a message output, i.e. something we'll need to be able to deserialize
+class OutputComplexTypeInfo(xmlName: String, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, fields) {
+	
+	override def headerImportFile(): String = { "zkDeserializer.h" }
+	override def baseClass(): String = { "ZKXMLDeserializer" }
+	
+	override protected def writeImplFileBody(w: PrintWriter) {
+		for (f <- fields)
+			w.println(f.readImplBody)
+	}
+}
 
 class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	private val complexTypeElems = createComplexTypesElems(wsdl)
@@ -239,7 +279,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		// we insert a temporary version of the complexType to handle recursive definitions
 		complexTypes(xmlName) = new ComplexTypeInfo(xmlName, List())
 		val fields = (ct \ "sequence" \ "element").map( x => generateField(x, dir) )
-		val i = new ComplexTypeInfo(xmlName, fields)
+		val i = if (dir == Direction.Serialize) new InputComplexTypeInfo(xmlName, fields) else new OutputComplexTypeInfo(xmlName, fields)
 		i.direction += dir
 		complexTypes(xmlName) = i
 		return i
