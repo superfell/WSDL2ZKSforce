@@ -250,8 +250,6 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 		}
 	}
 	
-	override protected def implementNSCopying(): Boolean = { objcName == "ZKDescribeField" }
-	
 	override protected def writeImplFileBody(w: PrintWriter) {
 		if (implementNSCopying) {
 			w.println(s"""-(id)copyWithZone:(NSZone *)zone {
@@ -277,6 +275,12 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 		for (f <- fields)
 			w.println(f.readImplBody)
 	}
+}
+
+class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[ComplexTypeProperty]) extends OutputComplexTypeInfo(xmlName, objcName, xmlNode, fields) {
+	
+	override protected def implementNSCopying(): Boolean = { true }
+	
 }
 
 class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
@@ -358,6 +362,15 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 						)
 		return newNames.getOrElse(xmlName, "ZK" + xmlName.capitalize)
 	}
+
+	private def defaultComplexType(dir: Direction.Value, xmlName: String, objcName: String, ct: Node, fields: Seq[ComplexTypeProperty]): ComplexTypeInfo = {
+		if (objcName == "ZKDescribeField")
+			new ZKDescribeField(xmlName, objcName, ct, fields);
+		else if (dir == Direction.Serialize)
+			new InputComplexTypeInfo(xmlName, objcName, ct, fields) 
+		else
+			new OutputComplexTypeInfo(xmlName, objcName, ct, fields)
+	}
 	
 	private def makeComplexType(xmlName: String, dir: Direction.Value): ComplexTypeInfo = {
 		val ct = complexTypeElems(xmlName)
@@ -365,7 +378,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		// we insert a temporary version of the complexType to handle recursive definitions
 		complexTypes(xmlName) = new ComplexTypeInfo(xmlName, objcName, ct, List())
 		val fields = (ct \ "sequence" \ "element").map( x => generateField(x, dir) )
-		val i = if (dir == Direction.Serialize) new InputComplexTypeInfo(xmlName, objcName, ct, fields) else new OutputComplexTypeInfo(xmlName, objcName, ct, fields)
+		val i = defaultComplexType(dir, xmlName, objcName, ct, fields)
 		i.direction += dir
 		complexTypes(xmlName) = i
 		return i
