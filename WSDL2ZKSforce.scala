@@ -119,41 +119,55 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: 
 		writeComment(h, hfile)
 		h.println(s"""#import "$headerImportFile"""")
 		h.println()
-		for (f <- fields.filter(_.propType.isGeneratedType))
-			h.println(s"@class ${f.propType.objcName};")
+		writeForwardDecls(h)
 		h.println("/*")
 		val pp = new PrettyPrinter(809, 2)
 		h.println(pp.format(xmlNode))
 		h.println("*/")
 		val nscopying = if (implementNSCopying()) "<NSCopying> " else ""
 		h.println(s"@interface $objcName : ${baseClass} $nscopying{");
-		val padTo = if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max + 1
-		if (includeIVarDecl)
-			for (f <- fields)
-				h.println(f.ivarDecl(padTo))
+		writeHeaderIVars(h)
 		h.println("}")
-		for (f <- fields)
-			h.println(f.propertyDecl(padTo, fieldsAreReadOnly))
+		writeHeaderProperties(h)
 		h.println("@end")
 		h.close()
+	}
+
+	protected def writeForwardDecls(w: PrintWriter) {
+		for (f <- fields.filter(_.propType.isGeneratedType))
+			w.println(s"@class ${f.propType.objcName};")
+	}
+	
+	private def padMembersTo(): Int = {
+ 		if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max + 1
+	}
+	
+	protected def writeHeaderIVars(w: PrintWriter) {
+		if (includeIVarDecl)
+			for (f <- fields)
+				w.println(f.ivarDecl(padMembersTo))
+	}
+
+	protected def writeHeaderProperties(w: PrintWriter) {
+		val padTo = padMembersTo
+		for (f <- fields)
+			w.println(f.propertyDecl(padTo, fieldsAreReadOnly))
 	}
 	
 	protected def writeImplFileBody(w: PrintWriter) {} 
 	
-	protected def writeImports(w: PrintWriter) {}
+	protected def writeImplImports(w: PrintWriter) {}
 		
 	def writeImplFile() {
 		val ifile = new File(new File("output"), objcName + ".m")
 		val w = new PrintWriter(ifile)
 		writeComment(w, ifile)
 		w.println(s"""#import "$objcName.h"""")
-		writeImports(w)
+		writeImplImports(w)
 		w.println()
 		w.println(s"@implementation $objcName")
 		w.println()
-
 		writeImplFileBody(w)
-			
 		w.println("@end")
 		w.close()
 	}
@@ -207,7 +221,7 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 		f.name.length + f.serializeMethodName.length
 	}
 	
-	override protected def writeImports(w: PrintWriter) {
+	override protected def writeImplImports(w: PrintWriter) {
 		w.println("""#import "zkEnvelope.h"""")
 	}
 
@@ -239,7 +253,7 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 	override def headerImportFile(): String = { "zkXmlDeserializer.h" }
 	override def baseClass(): String = { "ZKXmlDeserializer" }
 	
-	override protected def writeImports(w: PrintWriter) {
+	override protected def writeImplImports(w: PrintWriter) {
 		for (f <- fields) {
 			val importStmt = f.propType match {
 				case a:ArrayTypeInfo => if (a.componentType.isGeneratedType) s"""#import "${a.componentType.objcName}.h"""" else ""
@@ -250,11 +264,14 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 		}
 	}
 	
+	protected def additionalNSCopyImpl(): String = { "" }
+	 
 	override protected def writeImplFileBody(w: PrintWriter) {
 		if (implementNSCopying) {
 			w.println(s"""-(id)copyWithZone:(NSZone *)zone {
 				|    zkElement *e = [[node copyWithZone:zone] autorelease];
 				|    $objcName *c = [[$objcName alloc] initWithXmlElement:e];
+				|    ${additionalNSCopyImpl}
 				|    return c;
 				|}
 				|
@@ -281,6 +298,33 @@ class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[
 	
 	override protected def implementNSCopying(): Boolean = { true }
 	
+	override protected def writeForwardDecls(w: PrintWriter) {
+		w.println("@class ZKDescribeSObject;")
+		super.writeForwardDecls(w)
+	}
+	
+	override protected def writeHeaderIVars(w: PrintWriter) {
+		w.println("\tZKDescribeSObject *sobject")
+	}
+	
+	override protected def writeHeaderProperties(w: PrintWriter) {
+		w.println("@property (assign) ZKDescribeSObject *sobject; // assign to stop a ref counting loop")
+		w.println()
+		super.writeHeaderProperties(w)
+	}
+	
+	override protected def writeImplImports(w: PrintWriter) {
+		w.println("""#import "ZKDescribeSObject.h"""")
+		super.writeImplImports(w)
+	}
+	
+	override protected def additionalNSCopyImpl(): String = { "c.sobject = self.sobject;" }
+	
+	override protected def writeImplFileBody(w: PrintWriter) {
+		w.println("@synthesize sobject;")
+		w.println()
+		super.writeImplFileBody(w)
+	}
 }
 
 class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
