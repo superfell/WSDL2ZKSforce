@@ -90,17 +90,7 @@ object Direction extends Enumeration {
 	val Serialize, Deserialize = Value
 }
 
-def remappedName(objcName: String): String = {
-	// There are some generated types that for legacy reasons we want to have a different name to the default name mapped from the wsdl
-	val newNames = Map(
-					// default Name		  -> name to use instead
-					"ZKGetUserInfoResult" -> "ZKUserInfo",
-					"ZKField"	  		  -> "ZKDescribeField"
-					)
-	return newNames.getOrElse(objcName, objcName)
-}
-
-class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, remappedName("ZK" + xmlName.capitalize), "", true) {
+class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, objcName, "", true) {
 	
 	val direction =  Direction.ValueSet.newBuilder
 
@@ -206,7 +196,7 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 }
 
 // A ComplexType from a message input, i.e. something we'll need to be able to serialize
-class InputComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, xmlNode, fields) {
+class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, objcName, xmlNode, fields) {
 
 	override def headerImportFile(): String = { "ZKXMLSerializable.h" }
 	override def baseClass(): String = { "NSObject<ZKXMLSerializable>" }
@@ -244,7 +234,7 @@ class InputComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTy
 }
 
 // A ComplexType from a message output, i.e. something we'll need to be able to deserialize
-class OutputComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, xmlNode, fields) {
+class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, objcName, xmlNode, fields) {
 	
 	override def headerImportFile(): String = { "zkXmlDeserializer.h" }
 	override def baseClass(): String = { "ZKXmlDeserializer" }
@@ -358,12 +348,24 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		return collection.immutable.Map[String, Node]()
 	}
 	
+	
+	private def makeObjcName(xmlName: String): String = {
+		// There are some generated types that for legacy reasons we want to have a different name to the default name mapped from the wsdl
+		val newNames = Map(
+						// default Name		  -> name to use instead
+						"GetUserInfoResult" -> "ZKUserInfo",
+						"Field"	  		    -> "ZKDescribeField"
+						)
+		return newNames.getOrElse(xmlName, "ZK" + xmlName.capitalize)
+	}
+	
 	private def makeComplexType(xmlName: String, dir: Direction.Value): ComplexTypeInfo = {
 		val ct = complexTypeElems(xmlName)
+		val objcName = makeObjcName(xmlName)
 		// we insert a temporary version of the complexType to handle recursive definitions
-		complexTypes(xmlName) = new ComplexTypeInfo(xmlName, ct, List())
+		complexTypes(xmlName) = new ComplexTypeInfo(xmlName, objcName, ct, List())
 		val fields = (ct \ "sequence" \ "element").map( x => generateField(x, dir) )
-		val i = if (dir == Direction.Serialize) new InputComplexTypeInfo(xmlName, ct, fields) else new OutputComplexTypeInfo(xmlName, ct, fields)
+		val i = if (dir == Direction.Serialize) new InputComplexTypeInfo(xmlName, objcName, ct, fields) else new OutputComplexTypeInfo(xmlName, objcName, ct, fields)
 		i.direction += dir
 		complexTypes(xmlName) = i
 		return i
