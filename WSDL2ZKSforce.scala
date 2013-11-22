@@ -119,7 +119,7 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 		h.println(s"""#import "$headerImportFile"""")
 		h.println()
 		for (f <- fields.filter(_.propType.isGeneratedType))
-			h.println(s"@class ${f.propType.objcName}")
+			h.println(s"@class ${f.propType.objcName};")
 		h.println("/*")
 		val pp = new PrettyPrinter(809, 2)
 		h.println(pp.format(xmlNode))
