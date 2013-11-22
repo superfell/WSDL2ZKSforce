@@ -115,7 +115,7 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 		val hfile = new File(new File("output"), objcName + ".h")
 		hfile.getParentFile().mkdirs()
 		val h = new PrintWriter(hfile)
-		writeComment(h)
+		writeComment(h, hfile)
 		h.println(s"""#import "$headerImportFile"""")
 		h.println()
 		for (f <- fields.filter(_.propType.isGeneratedType))
@@ -143,7 +143,7 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 	def writeImplFile() {
 		val ifile = new File(new File("output"), objcName + ".m")
 		val w = new PrintWriter(ifile)
-		writeComment(w)
+		writeComment(w, ifile)
 		w.println(s"""#import "$objcName.h"""")
 		writeImports(w)
 		w.println()
@@ -156,9 +156,13 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 		w.close()
 	}
 	
-	private def writeComment(w: PrintWriter) {
-		w.println("""/// Copyright (c) 2006-2013 Simon Fell
-		///
+	private def writeComment(w: PrintWriter, file: File) {
+		val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+		val defaultCopyright = s"// Copyright (c) $year Simon Fell"
+		val originalCopyright = getOriginalCopyright(file)
+		val copyRight = if (originalCopyright == null) defaultCopyright else originalCopyright
+		w.println(copyRight)
+		w.println("""///
 		/// Permission is hereby granted, free of charge, to any person obtaining a 
 		/// copy of this software and associated documentation files (the "Software"), 
 		/// to deal in the Software without restriction, including without limitation
@@ -178,6 +182,14 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 		/// THE SOFTWARE.
 		///
 		/""".stripMargin('/'));
+	}
+	
+	// reads the first line of the copyright from the current matching source file in the zkSforce tree, if it exists.
+	private def getOriginalCopyright(file: File): String = {
+		val src = new File(file.getParentFile(), "../../zkSforce/zkSforce/" + file.getName())
+		if (!src.exists()) return null
+		val line = scala.io.Source.fromFile(src.getAbsolutePath()).getLines().next
+		if (line contains "Copyright") line else null
 	}
 }
 
