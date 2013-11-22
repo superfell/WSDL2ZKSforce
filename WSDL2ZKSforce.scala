@@ -197,7 +197,7 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 class InputComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, xmlNode, fields) {
 
 	override def headerImportFile(): String = { "ZKXMLSerializable.h" }
-	override def baseClass(): String = { "NSObject<XMLSerializable>" }
+	override def baseClass(): String = { "NSObject<ZKXMLSerializable>" }
 	override def includeIVarDecl(): Boolean = { true }
 	override def fieldsAreReadOnly(): Boolean = { false }
 	
@@ -205,16 +205,20 @@ class InputComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTy
 		f.name.length + f.serializeMethodName.length
 	}
 	
+	override protected def writeImports(w: PrintWriter) {
+		w.println("""#import "zkEnvelope.h"""")
+	}
+
 	override protected def writeImplFileBody(w: PrintWriter) {
 		w.println("@synthesize " + fields.map(_.name).mkString(", ") + ";")
 		w.println()
 		w.println("-(void)dealloc {")
 		for (f <- fields.filter(_.propType.isPointer))
 			w.println(s"\t[${f.name} release];")
-		w.println("\t[super dealloc]")
+		w.println("\t[super dealloc];")
 		w.println("}")
 		w.println("-(void)serializeToEnvelope:(ZKEnvelope *)env elemName:(NSString *)elemName {")
-		w.println("\t[env startElement:elemName]")
+		w.println("\t[env startElement:elemName];")
 		val padTo = if (fields.length > 0) fields.map(addLength(_)).max else 0
 		for (f <- fields) {
 			val addMethod = f.serializeMethodName
@@ -222,7 +226,7 @@ class InputComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTy
 			val name = (f.name + "\"").padTo(pad, ' ')
 			w.println(s"""\t[env $addMethod:@"$name elemValue:self.${f.name}];""")
 		}
-		w.println("\t[env endElement:elemName]")
+		w.println("\t[env endElement:elemName];")
 		w.println("}")
 	} 
 }
