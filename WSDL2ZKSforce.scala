@@ -90,7 +90,17 @@ object Direction extends Enumeration {
 	val Serialize, Deserialize = Value
 }
 
-class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, "ZK" + xmlName.capitalize, "", true) {
+def remappedName(objcName: String): String = {
+	// There are some generated types that for legacy reasons we want to have a different name to the default name mapped from the wsdl
+	val newNames = Map(
+					// default Name		  -> name to use instead
+					"ZKGetUserInfoResult" -> "ZKUserInfo",
+					"ZKField"	  		  -> "ZKDescribeField"
+					)
+	return newNames.getOrElse(objcName, objcName)
+}
+
+class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, remappedName("ZK" + xmlName.capitalize), "", true) {
 	
 	val direction =  Direction.ValueSet.newBuilder
 
@@ -104,10 +114,11 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 		s"""[[self complexTypeArrayFromElements:@"$elemName" cls:[${objcName} class]] lastObject]"""
 	}
 	
-	def headerImportFile(): String = { "" }
-	def baseClass(): String = { "" }
-	def includeIVarDecl(): Boolean = { false }
-	def fieldsAreReadOnly(): Boolean = { true }
+	protected def headerImportFile(): String = { "" }
+	protected def baseClass(): String = { "" }
+	protected def includeIVarDecl(): Boolean = { false }
+	protected def fieldsAreReadOnly(): Boolean = { true }
+	protected def implementNSCopying(): Boolean = { false }
 	
 	def writeHeaderFile() {
 		validate()
@@ -124,7 +135,8 @@ class ComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexTypePro
 		val pp = new PrettyPrinter(809, 2)
 		h.println(pp.format(xmlNode))
 		h.println("*/")
-		h.println(s"@interface $objcName : ${baseClass} {");
+		val nscopying = if (implementNSCopying()) "<NSCopying> " else ""
+		h.println(s"@interface $objcName : ${baseClass} $nscopying{");
 		val padTo = if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max + 1
 		if (includeIVarDecl)
 			for (f <- fields)
@@ -248,7 +260,30 @@ class OutputComplexTypeInfo(xmlName: String, xmlNode: Node, fields: Seq[ComplexT
 		}
 	}
 	
+	override protected def implementNSCopying(): Boolean = { objcName == "ZKDescribeField" }
+	
 	override protected def writeImplFileBody(w: PrintWriter) {
+		if (implementNSCopying) {
+			w.println(s"""-(id)copyWithZone:(NSZone *)zone {
+				|    zkElement *e = [[node copyWithZone:zone] autorelease];
+				|    $objcName *c = [[$objcName alloc] initWithXmlElement:e];
+				|    return c;
+				|}
+				|
+				|-(zkElement *)node {
+				|	return node;
+				|}
+				|
+				|-(BOOL)isEqual:(id)anObject {
+				|	if (![anObject isKindOfClass:[$objcName class]]) return NO;
+				|	return [node isEqual:[anObject node]];
+				|}
+				|
+				|-(NSUInteger)hash {
+				|	return [node hash];
+				|}
+				|""".stripMargin('|'))
+		}
 		for (f <- fields)
 			w.println(f.readImplBody)
 	}
