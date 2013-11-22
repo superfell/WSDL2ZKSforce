@@ -42,6 +42,14 @@ class SourceWriter(val file: File) {
 		w.println(s)
 	}
 	
+	def printImport(f: String) {
+		w.println(s"""#import "$f"""")
+	}
+	
+	def printClassForwardDecl(c: String) {
+		w.println(s"@class $c;")
+	}
+	
 	// reads the first line of the copyright from the current matching source file in the zkSforce tree, if it exists.
 	private def getOriginalCopyright(file: File): String = {
 		val src = new File(file.getParentFile(), "../../zkSforce/zkSforce/" + file.getName())
@@ -169,7 +177,7 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: 
 		hfile.getParentFile().mkdirs()
 		val h = new SourceWriter(hfile)
 		h.printLicenseComment()
-		h.println(s"""#import "$headerImportFile"""")
+		h.printImport(headerImportFile)
 		h.println()
 		writeForwardDecls(h)
 		h.println("/*")
@@ -187,7 +195,7 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: 
 
 	protected def writeForwardDecls(w: SourceWriter) {
 		for (f <- fields.filter(_.propType.isGeneratedType))
-			w.println(s"@class ${f.propType.objcName};")
+			w.printClassForwardDecl(f.propType.objcName)
 	}
 	
 	private def padMembersTo(): Int = {
@@ -214,7 +222,7 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: 
 		val ifile = new File(new File("output"), objcName + ".m")
 		val w = new SourceWriter(ifile)
 		w.printLicenseComment()
-		w.println(s"""#import "$objcName.h"""")
+		w.printImport(objcName + ".h")
 		writeImplImports(w)
 		w.println()
 		w.println(s"@implementation $objcName")
@@ -238,7 +246,7 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 	}
 	
 	override protected def writeImplImports(w: SourceWriter) {
-		w.println("""#import "zkEnvelope.h"""")
+		w.printImport("zkEnvelope.h")
 	}
 
 	override protected def writeImplFileBody(w: SourceWriter) {
@@ -271,12 +279,12 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 	
 	override protected def writeImplImports(w: SourceWriter) {
 		for (f <- fields) {
-			val importStmt = f.propType match {
-				case a:ArrayTypeInfo => if (a.componentType.isGeneratedType) s"""#import "${a.componentType.objcName}.h"""" else ""
-				case t:TypeInfo      => if (t.isGeneratedType) s"""#import "${t.objcName}.h"""" else ""
+			val importFile = f.propType match {
+				case a:ArrayTypeInfo => if (a.componentType.isGeneratedType) a.componentType.objcName + ".h" else ""
+				case t:TypeInfo      => if (t.isGeneratedType) t.objcName + ".h" else ""
 			}
-			if (importStmt.length > 0)
-				w.println(importStmt)
+			if (importFile.length > 0)
+				w.printImport(importFile)
 		}
 	}
 	
@@ -315,7 +323,7 @@ class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[
 	override protected def implementNSCopying(): Boolean = { true }
 	
 	override protected def writeForwardDecls(w: SourceWriter) {
-		w.println("@class ZKDescribeSObject;")
+		w.printClassForwardDecl("ZKDescribeSObject")
 		super.writeForwardDecls(w)
 	}
 	
@@ -330,7 +338,7 @@ class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[
 	}
 	
 	override protected def writeImplImports(w: SourceWriter) {
-		w.println("""#import "ZKDescribeSObject.h"""")
+		w.printImport("ZKDescribeSObject.h")
 		super.writeImplImports(w)
 	}
 	
