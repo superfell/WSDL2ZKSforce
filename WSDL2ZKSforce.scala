@@ -27,6 +27,58 @@
 import scala.xml._
 import java.io._
 
+class SourceWriter(val file: File) {
+	val w = new PrintWriter(file)
+
+	def close() {
+		w.close()
+	}
+	
+	def println() {
+		w.println()
+	}
+	
+	def println(s: String) {
+		w.println(s)
+	}
+	
+	// reads the first line of the copyright from the current matching source file in the zkSforce tree, if it exists.
+	private def getOriginalCopyright(file: File): String = {
+		val src = new File(file.getParentFile(), "../../zkSforce/zkSforce/" + file.getName())
+		if (!src.exists()) return null
+		val line = scala.io.Source.fromFile(src.getAbsolutePath()).getLines().next
+		if (line contains "Copyright") line else null
+	}
+	
+	def printLicenseComment() {
+		val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+		val defaultCopyright = s"// Copyright (c) $year Simon Fell"
+		val originalCopyright = getOriginalCopyright(file)
+		val copyRight = if (originalCopyright == null) defaultCopyright else originalCopyright
+		w.println(copyRight)
+		w.println("""///
+		/// Permission is hereby granted, free of charge, to any person obtaining a 
+		/// copy of this software and associated documentation files (the "Software"), 
+		/// to deal in the Software without restriction, including without limitation
+		/// the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+		/// and/or sell copies of the Software, and to permit persons to whom the 
+		/// Software is furnished to do so, subject to the following conditions:
+		///
+		/// The above copyright notice and this permission notice shall be included 
+		/// in all copies or substantial portions of the Software.
+		///
+		/// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS 
+		/// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+		/// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+		/// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+		/// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+		/// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+		/// THE SOFTWARE.
+		///
+		/""".stripMargin('/'));
+	}
+}
+
 class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val isPointer: Boolean) {
 	
 	def propertyDeclComment(): String =  { "" }
@@ -115,8 +167,8 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: 
 
 		val hfile = new File(new File("output"), objcName + ".h")
 		hfile.getParentFile().mkdirs()
-		val h = new PrintWriter(hfile)
-		writeComment(h, hfile)
+		val h = new SourceWriter(hfile)
+		h.printLicenseComment()
 		h.println(s"""#import "$headerImportFile"""")
 		h.println()
 		writeForwardDecls(h)
@@ -133,7 +185,7 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: 
 		h.close()
 	}
 
-	protected def writeForwardDecls(w: PrintWriter) {
+	protected def writeForwardDecls(w: SourceWriter) {
 		for (f <- fields.filter(_.propType.isGeneratedType))
 			w.println(s"@class ${f.propType.objcName};")
 	}
@@ -142,26 +194,26 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: 
  		if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max + 1
 	}
 	
-	protected def writeHeaderIVars(w: PrintWriter) {
+	protected def writeHeaderIVars(w: SourceWriter) {
 		if (includeIVarDecl)
 			for (f <- fields)
 				w.println(f.ivarDecl(padMembersTo))
 	}
 
-	protected def writeHeaderProperties(w: PrintWriter) {
+	protected def writeHeaderProperties(w: SourceWriter) {
 		val padTo = padMembersTo
 		for (f <- fields)
 			w.println(f.propertyDecl(padTo, fieldsAreReadOnly))
 	}
 	
-	protected def writeImplFileBody(w: PrintWriter) {} 
+	protected def writeImplFileBody(w: SourceWriter) {} 
 	
-	protected def writeImplImports(w: PrintWriter) {}
+	protected def writeImplImports(w: SourceWriter) {}
 		
 	def writeImplFile() {
 		val ifile = new File(new File("output"), objcName + ".m")
-		val w = new PrintWriter(ifile)
-		writeComment(w, ifile)
+		val w = new SourceWriter(ifile)
+		w.printLicenseComment()
 		w.println(s"""#import "$objcName.h"""")
 		writeImplImports(w)
 		w.println()
@@ -170,42 +222,6 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: 
 		writeImplFileBody(w)
 		w.println("@end")
 		w.close()
-	}
-	
-	private def writeComment(w: PrintWriter, file: File) {
-		val year = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-		val defaultCopyright = s"// Copyright (c) $year Simon Fell"
-		val originalCopyright = getOriginalCopyright(file)
-		val copyRight = if (originalCopyright == null) defaultCopyright else originalCopyright
-		w.println(copyRight)
-		w.println("""///
-		/// Permission is hereby granted, free of charge, to any person obtaining a 
-		/// copy of this software and associated documentation files (the "Software"), 
-		/// to deal in the Software without restriction, including without limitation
-		/// the rights to use, copy, modify, merge, publish, distribute, sublicense, 
-		/// and/or sell copies of the Software, and to permit persons to whom the 
-		/// Software is furnished to do so, subject to the following conditions:
-		///
-		/// The above copyright notice and this permission notice shall be included 
-		/// in all copies or substantial portions of the Software.
-		///
-		/// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS 
-		/// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-		/// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-		/// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
-		/// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
-		/// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
-		/// THE SOFTWARE.
-		///
-		/""".stripMargin('/'));
-	}
-	
-	// reads the first line of the copyright from the current matching source file in the zkSforce tree, if it exists.
-	private def getOriginalCopyright(file: File): String = {
-		val src = new File(file.getParentFile(), "../../zkSforce/zkSforce/" + file.getName())
-		if (!src.exists()) return null
-		val line = scala.io.Source.fromFile(src.getAbsolutePath()).getLines().next
-		if (line contains "Copyright") line else null
 	}
 }
 
@@ -221,11 +237,11 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 		f.name.length + f.serializeMethodName.length
 	}
 	
-	override protected def writeImplImports(w: PrintWriter) {
+	override protected def writeImplImports(w: SourceWriter) {
 		w.println("""#import "zkEnvelope.h"""")
 	}
 
-	override protected def writeImplFileBody(w: PrintWriter) {
+	override protected def writeImplFileBody(w: SourceWriter) {
 		w.println("@synthesize " + fields.map(_.name).mkString(", ") + ";")
 		w.println()
 		w.println("-(void)dealloc {")
@@ -253,7 +269,7 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 	override def headerImportFile(): String = { "zkXmlDeserializer.h" }
 	override def baseClass(): String = { "ZKXmlDeserializer" }
 	
-	override protected def writeImplImports(w: PrintWriter) {
+	override protected def writeImplImports(w: SourceWriter) {
 		for (f <- fields) {
 			val importStmt = f.propType match {
 				case a:ArrayTypeInfo => if (a.componentType.isGeneratedType) s"""#import "${a.componentType.objcName}.h"""" else ""
@@ -266,7 +282,7 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 	
 	protected def additionalNSCopyImpl(): String = { "" }
 	 
-	override protected def writeImplFileBody(w: PrintWriter) {
+	override protected def writeImplFileBody(w: SourceWriter) {
 		if (implementNSCopying) {
 			w.println(s"""-(id)copyWithZone:(NSZone *)zone {
 				|    zkElement *e = [[node copyWithZone:zone] autorelease];
@@ -298,29 +314,29 @@ class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[
 	
 	override protected def implementNSCopying(): Boolean = { true }
 	
-	override protected def writeForwardDecls(w: PrintWriter) {
+	override protected def writeForwardDecls(w: SourceWriter) {
 		w.println("@class ZKDescribeSObject;")
 		super.writeForwardDecls(w)
 	}
 	
-	override protected def writeHeaderIVars(w: PrintWriter) {
-		w.println("\tZKDescribeSObject *sobject")
+	override protected def writeHeaderIVars(w: SourceWriter) {
+		w.println("\tZKDescribeSObject *sobject;")
 	}
 	
-	override protected def writeHeaderProperties(w: PrintWriter) {
+	override protected def writeHeaderProperties(w: SourceWriter) {
 		w.println("@property (assign) ZKDescribeSObject *sobject; // assign to stop a ref counting loop")
 		w.println()
 		super.writeHeaderProperties(w)
 	}
 	
-	override protected def writeImplImports(w: PrintWriter) {
+	override protected def writeImplImports(w: SourceWriter) {
 		w.println("""#import "ZKDescribeSObject.h"""")
 		super.writeImplImports(w)
 	}
 	
 	override protected def additionalNSCopyImpl(): String = { "c.sobject = self.sobject;" }
 	
-	override protected def writeImplFileBody(w: PrintWriter) {
+	override protected def writeImplFileBody(w: SourceWriter) {
 		w.println("@synthesize sobject;")
 		w.println()
 		super.writeImplFileBody(w)
