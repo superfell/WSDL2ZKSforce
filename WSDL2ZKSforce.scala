@@ -351,26 +351,100 @@ class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[
 	}
 }
 
+class OperationParameter(val name: String, val paramType: TypeInfo) {
+	def decl(): String = {
+		s"$name:(${paramType.fullTypeName})$name"
+	}
+}
+
+class Operation(val name: String, val description: String, val params: Seq[OperationParameter], val returnType:TypeInfo) {
+	
+	def writeMethodDecl(w: SourceWriter) {
+		w.println(s"""// $description
+					|-(${returnType.fullTypeName})$name${paramList};
+					|""".stripMargin('|'))
+	}
+	
+	def types():Seq[TypeInfo] = {
+		returnType +: params.map(_.paramType) 
+	}
+	
+	def paramList():String = {
+		if (params.length == 0) return ""
+		val fp = params(0)
+		val first = s":(${fp.paramType.fullTypeName})${fp.name}"
+		if (params.length == 1) return first
+		first + " " + params.tail.map(_.decl).mkString(" ")
+	}
+}
+
+class StubWriter(allOperations: Seq[Operation]) {
+
+	val operations = allOperations.filter(skipOperation(_))
+	
+	def writeStubClass() {
+		writeStubHeader()
+		writeStubImpl()
+	}
+	
+	def skipOperation(op: Operation): Boolean = {
+		return op.name != "login"
+	}
+	
+	def writeStubHeader() {
+		val w= new SourceWriter(new File(new File("output"), "zkSforceClient+Operations.h"))
+		w.printLicenseComment()
+		w.printImport("zkSforce.h")
+		w.println()
+		val types = Set(operations.map(_.types).flatten.filter(_.isGeneratedType) : _*)
+		for (t <- types)
+			w.printClassForwardDecl(t.objcName)
+		w.println()
+		w.println("@interface ZKSforceClient (Operations)")
+		for (op <- operations)
+			op.writeMethodDecl(w)
+		w.println("@end")
+		w.close()
+	}
+	
+	def writeStubImpl() {
+		
+	}
+}
+
 class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	private val complexTypeElems = createComplexTypesElems(wsdl)
 	private val complexTypes = collection.mutable.Map[String, ComplexTypeInfo]()
 	private val elements = createElements(wsdl)
 	private val simpleTypes = createSimpleTypes(wsdl)
+	private val operations = collection.mutable.MutableList[Operation]()
+	private val VOID = new TypeInfo("void", "void", null, false)
 	
 	val messages = createMessages(wsdl)
 
-	def handleInputElement(elementName: String) {
-		handleElement(elementName, Direction.Serialize)
+	def addOperation(name: String, inputElemName: String, outputElemName: String, description: String) {
+		val input = handleInputElement(inputElemName)
+		val output = handleOutputElement(outputElemName)
+		val opType = if (output.length > 0) output(0).propType else VOID
+		operations += new Operation(name, description, input.map(convertToParam(_)), opType)
 	}
 	
-	def handleOutputElement(elementName: String) {
-		handleElement(elementName, Direction.Deserialize)
+	def handleInputElement(elementName: String): Seq[ComplexTypeProperty] = {
+		return handleElement(elementName, Direction.Serialize)
 	}
 	
-	private def handleElement(elementName: String, dir: Direction.Value) {
+	def handleOutputElement(elementName: String): Seq[ComplexTypeProperty] = {
+		return handleElement(elementName, Direction.Deserialize)
+	}
+	
+	private def convertToParam(prop: ComplexTypeProperty): OperationParameter = {
+		return new OperationParameter(prop.name, prop.propType)
+	}
+	
+	private def handleElement(elementName: String, dir: Direction.Value): Seq[ComplexTypeProperty] = {
 		// walk through the element decl and build the related types.
 		val element = elements(elementName)
-		(element \ "complexType" \ "sequence" \ "element").map(generateField(_, dir))
+		return (element \ "complexType" \ "sequence" \ "element").map(generateField(_, dir))
 	}
 	
 	def complexType(xmlName: String, dir: Direction.Value) : ComplexTypeInfo = {
@@ -379,13 +453,17 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		return t
 	}
 	
+	def writeClientStub() {
+		new StubWriter(operations).writeStubClass()
+	}
+	
 	def writeTypes() {
 		for ((_, ct) <- complexTypes) {
 			ct.writeHeaderFile()
 			ct.writeImplFile()
 		}
 	}
-
+	
     def writeZKSforceh() {
 		val w = new SourceWriter(new File(new File("output"), "zkSforce.h"))
 		w.printLicenseComment()
@@ -515,11 +593,12 @@ object WSDL2ZKSforce {
 			val outMsg = schema.messages(stripPrefix((op \ "output" \ "@message").text))
 			val inElm  = stripPrefix((inMsg \ "part" \ "@element").text)
 			val outElm = stripPrefix((outMsg \ "part" \ "@element").text)
+			val desc   = (op \ "documentation").text
 			println(opName.padTo(40, ' ') + inElm.padTo(40, ' ' ) + outElm)
-			schema.handleInputElement(inElm)
-			schema.handleOutputElement(outElm)
+			schema.addOperation(opName, inElm, outElm, desc)
 		}
-		
+
+		schema.writeClientStub()
 		schema.writeTypes()
 		schema.writeZKSforceh()
   	}
