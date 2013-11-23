@@ -496,14 +496,15 @@ def stripPrefix(v: String): String = {
 object WSDL2ZKSforce {
 	def main(args: Array[String]) {
 		val types = Map(
-					"string" 		-> new TypeInfo("string", 		"NSString",  "string",  true),
-					"int" 	 		-> new TypeInfo("int",    		"NSInteger", "integer", false),
-					"boolean"		-> new TypeInfo("boolean", 		"BOOL", 	 "boolean", false),
-					"ID"	 		-> new TypeInfo("ID",			"NSString",  "string",  true),
-					"sObject"		-> new TypeInfo("sObject", 		"ZKSObject", "sObject",  true),
-					"dateTime"		-> new TypeInfo("dateTime",		"NSDate",  	 "dateTime", true),
-					"date"   		-> new TypeInfo("date",    		"NSDate",    "date",     true),
-					"base64Binary" 	-> new TypeInfo("base64Binary", "NSData", 	 "blob",     true)
+					"string" 		-> new TypeInfo("string", 		"NSString",  	"string",  		true),
+					"int" 	 		-> new TypeInfo("int",    		"NSInteger", 	"integer", 		false),
+					"boolean"		-> new TypeInfo("boolean", 		"BOOL", 	 	"boolean", 		false),
+					"ID"	 		-> new TypeInfo("ID",			"NSString",  	"string",  		true),
+					"sObject"		-> new TypeInfo("sObject", 		"ZKSObject", 	"sObject",  	true),
+					"QueryResult"   -> new TypeInfo("QueryResult",  "ZKQueryResult","queryResult",	true),
+					"dateTime"		-> new TypeInfo("dateTime",		"NSDate",  	 	"dateTime", 	true),
+					"date"   		-> new TypeInfo("date",    		"NSDate",    	"date",     	true),
+					"base64Binary" 	-> new TypeInfo("base64Binary", "NSData", 	 	"blob",     	true)
 					)
 					
 		val wsdl = XML.loadFile("./partner.wsdl")
