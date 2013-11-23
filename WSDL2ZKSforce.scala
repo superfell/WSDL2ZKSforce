@@ -386,6 +386,20 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		}
 	}
 
+    def writeZKSforceh() {
+		val w = new SourceWriter(new File(new File("output"), "zkSforce.h"))
+		w.printLicenseComment()
+		val fixedImports = List("zkSforceClient.h", "zkSObject.h", "zkSoapException.h")
+		for (i <- fixedImports)
+			w.printImport(i)
+		for ((_, ct) <- complexTypes)
+			if (ct.isGeneratedType)
+				w.printImport(ct.objcName + ".h")
+		for(f <- new File("../zkSforce/zkSforce").listFiles().filter(_.getName().contains("+")))
+			w.printImport(f.getName())
+		w.close()
+	}
+	
 	private def createSimpleTypes(wsdl: Elem): Map[String, Node] = {
 		val schemas = (wsdl \ "types" \ "schema" )
 		for (schema <- schemas) {
@@ -506,6 +520,7 @@ object WSDL2ZKSforce {
 		}
 		
 		schema.writeTypes()
+		schema.writeZKSforceh()
   	}
 }
 
