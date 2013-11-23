@@ -97,8 +97,8 @@ class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val 
 	
 	def isGeneratedType(): Boolean = { objcName.startsWith("ZK") }	// TODO
 	
-	def accessor(elemName: String): String = {
-		s"""[self $accessor:@"$elemName"]"""
+	def accessor(instanceName: String, elemName: String): String = {
+		s"""[$instanceName $accessor:@"$elemName"]"""
 	}
 }
 
@@ -106,11 +106,11 @@ class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.
 
 	override def propertyDeclComment(): String =  { " // of " + componentType.objcName }
 	
-	override def accessor(elemName: String): String = {
+	override def accessor(instanceName:String, elemName: String): String = {
 		if (componentType.objcName == "NSString")
-			s"""[self strings:@"$elemName"]"""
+			s"""[$instanceName strings:@"$elemName"]"""
 		else
-			s"""[self complexTypeArrayFromElements:@"$elemName" cls:[${componentType.objcName} class]]"""
+			s"""[$instanceName complexTypeArrayFromElements:@"$elemName" cls:[${componentType.objcName} class]]"""
 	}
 }
 
@@ -118,7 +118,7 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 	
 	def readImplBody(): String =  {
 		s"""-(${propType.fullTypeName})$name {
-			|    return ${propType.accessor(name)};
+			|    return ${propType.accessor("self", name)};
 			|}
 			""".stripMargin('|')
 	}
@@ -160,8 +160,8 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: 
 			throw new RuntimeException("complexType with both serialization & deserialization not supported")
 	}
 	
-	override def accessor(elemName: String): String = {
-		s"""[[self complexTypeArrayFromElements:@"$elemName" cls:[${objcName} class]] lastObject]"""
+	override def accessor(instanceName:String, elemName: String): String = {
+		s"""[[$instanceName complexTypeArrayFromElements:@"$elemName" cls:[${objcName} class]] lastObject]"""
 	}
 	
 	protected def headerImportFile(): String = { "" }
@@ -351,18 +351,50 @@ class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[
 	}
 }
 
+class VoidTypeInfo() extends TypeInfo("void", "void", "", false) {
+	override def accessor(instanceName:String, elemName:String) : String = { "" }
+}
+
 class OperationParameter(val name: String, val paramType: TypeInfo) {
 	def decl(): String = {
 		s"$name:(${paramType.fullTypeName})$name"
+	}
+	
+	def printAddElement(w: SourceWriter) {
+		w.println(s"""	[env addElement:@"${name}" elemValue:${name}];""")
 	}
 }
 
 class Operation(val name: String, val description: String, val params: Seq[OperationParameter], val returnType:TypeInfo) {
 	
+	def objcSignature(): String = {
+		s"-(${returnType.fullTypeName})$name${paramList}"
+	}
+	
 	def writeMethodDecl(w: SourceWriter) {
 		w.println(s"""// $description
-					|-(${returnType.fullTypeName})$name${paramList};
+					|$objcSignature;
 					|""".stripMargin('|'))
+	}
+	
+	def writeMethodImpl(w: SourceWriter) {
+		val nullValue = if (returnType.objcName == "void") "" else "nil"
+		w.println(s"""// $description
+					|$objcSignature {
+					|	if (!authSource) return $nullValue;
+					|	[self checkSession];
+					|	ZKEnvelope *env = [[[ZKPartnerEnvelope alloc] initWithSessionHeader:[authSource sessionId] clientId:clientId] autorelease];
+				    |	[env startElement:@"${name}"];""".stripMargin('|'));
+		for (p <- params)
+			p.printAddElement(w);
+		val retStmt = returnType.accessor("deser", "result")
+		w.println(s"""|	[env endElement:@"${name}"];
+					 |	[env endElement:@"s:Body"];
+					 |	zkElement *rn = [self sendRequest:[env end]];
+					 |	ZKXmlDeserializer *deser = [[[ZKXmlDeserializer alloc] initWithXmlElement:rn] autorelease];
+					 |	return $retStmt;
+					 |}
+					 |""".stripMargin('|'))
 	}
 	
 	def types():Seq[TypeInfo] = {
@@ -381,7 +413,7 @@ class Operation(val name: String, val description: String, val params: Seq[Opera
 class StubWriter(allOperations: Seq[Operation]) {
 
 	val operations = allOperations.filter(skipOperation(_))
-	
+
 	def writeStubClass() {
 		writeStubHeader()
 		writeStubImpl()
@@ -391,13 +423,16 @@ class StubWriter(allOperations: Seq[Operation]) {
 		return op.name != "login"
 	}
 	
+	def referencedTypes(): Set[TypeInfo] = {
+		Set(operations.map(_.types).flatten : _*)
+	}
+	
 	def writeStubHeader() {
 		val w= new SourceWriter(new File(new File("output"), "zkSforceClient+Operations.h"))
 		w.printLicenseComment()
 		w.printImport("zkSforce.h")
 		w.println()
-		val types = Set(operations.map(_.types).flatten.filter(_.isGeneratedType) : _*)
-		for (t <- types)
+		for (t <- referencedTypes.filter(_.isGeneratedType))
 			w.printClassForwardDecl(t.objcName)
 		w.println()
 		w.println("@interface ZKSforceClient (Operations)")
@@ -408,7 +443,18 @@ class StubWriter(allOperations: Seq[Operation]) {
 	}
 	
 	def writeStubImpl() {
-		
+		val w = new SourceWriter(new File(new File("output"), "zkSforceClient+Operations.m"))
+		w.printLicenseComment();
+		w.printImport("zkSforceClient+Operations.h")
+		w.println()
+		for (t <- referencedTypes.filter(_.isGeneratedType))
+			w.printImport(t.objcName)
+		w.println()
+		w.println("@implementation ZKSforceClient (Operations)")
+		for (op <- operations)
+			op.writeMethodImpl(w)
+		w.println("@end")
+		w.close()
 	}
 }
 
@@ -418,7 +464,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	private val elements = createElements(wsdl)
 	private val simpleTypes = createSimpleTypes(wsdl)
 	private val operations = collection.mutable.MutableList[Operation]()
-	private val VOID = new TypeInfo("void", "void", null, false)
+	private val VOID = new VoidTypeInfo()
 	
 	val messages = createMessages(wsdl)
 
@@ -473,7 +519,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		for ((_, ct) <- complexTypes)
 			if (ct.isGeneratedType)
 				w.printImport(ct.objcName + ".h")
-		for(f <- new File("../zkSforce/zkSforce").listFiles().filter(_.getName().contains("+")))
+		for(f <- new File("../zkSforce/zkSforce").listFiles().filter(_.getName().contains("+")).filter(_.getName().endsWith(".h")))
 			w.printImport(f.getName())
 		w.close()
 	}
