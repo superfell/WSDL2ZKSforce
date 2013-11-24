@@ -394,12 +394,18 @@ class Operation(val name: String, val description: String, val params: Seq[Opera
 			p.printAddElement(w);
 		val retStmt = returnType.accessor("deser", "result")
 		w.println(s"""|	[env endElement:@"${name}"];
-					 |	[env endElement:@"s:Body"];
-					 |	zkElement *rn = [self sendRequest:[env end]];
+					 |	[env endElement:@"s:Body"];""".stripMargin('|'))
+		if (returnType.objcName == "void") {
+			w.println("""	[self sendRequest:[env end]];
+						|}
+						|""".stripMargin('|'))
+		} else {
+			w.println(s"""	zkElement *rn = [self sendRequest:[env end]];
 					 |	ZKXmlDeserializer *deser = [[[ZKXmlDeserializer alloc] initWithXmlElement:rn] autorelease];
 					 |	return $retStmt;
 					 |}
 					 |""".stripMargin('|'))
+		}
 	}
 	
 	def types():Seq[TypeInfo] = {
