@@ -417,6 +417,7 @@ class Operation(val name: String, val description: String, val params: Seq[Opera
 
 class StubWriter(allOperations: Seq[Operation]) {
 
+	val toSkip = Set("login", "describeSObject", "describeLayout", "create", "update", "delete", "getUserInfo", "describeGlobal",  "describeTabs", "search", "query", "queryAll", "queryMore", "retreive", "setPassword", "convertLead", "serverTimestamp")
 	val operations = allOperations.filter(skipOperation(_))
 
 	def writeStubClass() {
@@ -425,7 +426,7 @@ class StubWriter(allOperations: Seq[Operation]) {
 	}
 	
 	def skipOperation(op: Operation): Boolean = {
-		return op.name != "login"
+		!toSkip.contains(op.name)
 	}
 	
 	def referencedTypes(): Set[TypeInfo] = {
@@ -433,7 +434,7 @@ class StubWriter(allOperations: Seq[Operation]) {
 	}
 	
 	def writeStubHeader() {
-		val w= new SourceWriter(new File(new File("output"), "zkSforceClient+Operations.h"))
+		val w= new SourceWriter(new File(new File("output"), "ZKSforceClient+Operations.h"))
 		w.printLicenseComment()
 		w.printImport("zkSforce.h")
 		w.println()
@@ -448,9 +449,10 @@ class StubWriter(allOperations: Seq[Operation]) {
 	}
 	
 	def writeStubImpl() {
-		val w = new SourceWriter(new File(new File("output"), "zkSforceClient+Operations.m"))
+		val w = new SourceWriter(new File(new File("output"), "ZKSforceClient+Operations.m"))
 		w.printLicenseComment();
-		w.printImport("zkSforceClient+Operations.h")
+		w.printImport("ZKSforceClient+Operations.h")
+		w.printImport("ZKPartnerEnvelope.h")
 		w.printImports(referencedTypes)
 		w.println()
 		w.println("@implementation ZKSforceClient (Operations)")
