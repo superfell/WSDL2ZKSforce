@@ -42,6 +42,18 @@ class SourceWriter(val file: File) {
 		w.println(s)
 	}
 	
+	// for the collection of types, adds any import statements that would be needed.
+	def printImports(types: Iterable[TypeInfo]) {
+		val imports = types.map({
+			_ match {
+				case a:ArrayTypeInfo => if (a.componentType.isGeneratedType) a.componentType.objcName + ".h" else ""
+				case t:TypeInfo      => if (t.isGeneratedType) t.objcName + ".h" else ""
+			}
+		})
+		for (t <- imports.toSet.filter(_.length > 0))
+			printImport(t)
+	}
+	
 	def printImport(f: String) {
 		w.println(s"""#import "$f"""")
 	}
@@ -278,14 +290,7 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 	override def baseClass(): String = { "ZKXmlDeserializer" }
 	
 	override protected def writeImplImports(w: SourceWriter) {
-		for (f <- fields) {
-			val importFile = f.propType match {
-				case a:ArrayTypeInfo => if (a.componentType.isGeneratedType) a.componentType.objcName + ".h" else ""
-				case t:TypeInfo      => if (t.isGeneratedType) t.objcName + ".h" else ""
-			}
-			if (importFile.length > 0)
-				w.printImport(importFile)
-		}
+		w.printImports(fields.map(_.propType))
 	}
 	
 	protected def additionalNSCopyImpl(): String = { "" }
@@ -446,9 +451,7 @@ class StubWriter(allOperations: Seq[Operation]) {
 		val w = new SourceWriter(new File(new File("output"), "zkSforceClient+Operations.m"))
 		w.printLicenseComment();
 		w.printImport("zkSforceClient+Operations.h")
-		w.println()
-		for (t <- referencedTypes.filter(_.isGeneratedType))
-			w.printImport(t.objcName)
+		w.printImports(referencedTypes)
 		w.println()
 		w.println("@implementation ZKSforceClient (Operations)")
 		for (op <- operations)
