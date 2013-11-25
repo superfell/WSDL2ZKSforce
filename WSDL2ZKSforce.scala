@@ -50,7 +50,9 @@ class SourceWriter(val file: File) {
 				case t:TypeInfo      => if (t.isGeneratedType) t.objcName + ".h" else ""
 			}
 		})
-		for (t <- imports.toSet.filter(_.length > 0))
+		val ts = collection.immutable.TreeSet.empty[String]
+		val its = ts ++ imports
+		for (t <- its.filter(_.length > 0))
 			printImport(t)
 	}
 	
@@ -444,8 +446,9 @@ class StubWriter(allOperations: Seq[Operation]) {
 		w.printLicenseComment()
 		w.printImport("zkSforce.h")
 		w.println()
-		for (t <- referencedTypes.filter(_.isGeneratedType))
-			w.printClassForwardDecl(t.objcName)
+		val rts = collection.immutable.TreeSet.empty[String] ++ referencedTypes.filter(_.isGeneratedType).map(_.objcName)
+		for (t <- rts)
+			w.printClassForwardDecl(t)
 		w.println()
 		w.println("@interface ZKSforceClient (Operations)")
 		for (op <- operations)
