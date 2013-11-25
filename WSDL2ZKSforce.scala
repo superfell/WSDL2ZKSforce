@@ -425,7 +425,7 @@ class Operation(val name: String, val description: String, val params: Seq[Opera
 
 class StubWriter(allOperations: Seq[Operation]) {
 
-	val toSkip = Set("login", "describeSObject", "create", "update", "delete", "describeGlobal", "search", "retreive", "serverTimestamp")
+	val toSkip = Set("login", "describeSObject", "create", "update", "describeGlobal", "search", "retreive", "serverTimestamp")
 	val operations = allOperations.filter(skipOperation(_))
 
 	def writeStubClass() {
@@ -647,6 +647,7 @@ object WSDL2ZKSforce {
 					
 		val wsdl = XML.loadFile("./partner.wsdl")
 		val schema = new Schema(wsdl, types)
+		
 		for (op <- (wsdl \ "portType" \ "operation")) {
 			val opName = (op \ "@name").text
 			val inMsg  = schema.messages(stripPrefix((op \ "input" \ "@message").text))
