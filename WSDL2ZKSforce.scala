@@ -112,6 +112,10 @@ class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val 
 	def accessor(instanceName: String, elemName: String): String = {
 		s"""[$instanceName $accessor:@"$elemName"]"""
 	}
+	
+	def serializerMethodName() : String = { 
+		if (objcName == "BOOL") "addBoolElement" else "addElement"
+	}
 }
 
 class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.xmlName, "NSArray", "", true) {
@@ -145,10 +149,6 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 	def ivarDecl(padTypeTo: Int): String = {
 		val td = typeDef(padTypeTo)
 		s"\t$td;"
-	}
-	
-	def serializeMethodName(): String = {
-		if (propType.objcName == "BOOL") "addBoolElement" else "addElement"
 	}
 	
 	private def typeDef(padTypeTo: Int): String = {
@@ -254,7 +254,7 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 	override def fieldsAreReadOnly(): Boolean = { false }
 	
 	private def addLength(f: ComplexTypeProperty): Int = {
-		f.name.length + f.serializeMethodName.length
+		f.name.length + f.propType.serializerMethodName.length
 	}
 	
 	override protected def writeImplImports(w: SourceWriter) {
@@ -273,7 +273,7 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 		w.println("\t[env startElement:elemName];")
 		val padTo = if (fields.length > 0) fields.map(addLength(_)).max else 0
 		for (f <- fields) {
-			val addMethod = f.serializeMethodName
+			val addMethod = f.propType.serializerMethodName
 			val pad = padTo - addMethod.length + 1
 			val name = (f.name + "\"").padTo(pad, ' ')
 			w.println(s"""\t[env $addMethod:@"$name elemValue:self.${f.name}];""")
@@ -366,7 +366,7 @@ class OperationParameter(val name: String, val paramType: TypeInfo) {
 	}
 	
 	def printAddElement(w: SourceWriter) {
-		w.println(s"""	[env addElement:@"${name}" elemValue:${name}];""")
+		w.println(s"""	[env ${paramType.serializerMethodName}:@"${name}" elemValue:${name}];""")
 	}
 }
 
