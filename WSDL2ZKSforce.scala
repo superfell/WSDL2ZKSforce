@@ -425,7 +425,7 @@ class Operation(val name: String, val description: String, val params: Seq[Opera
 
 class StubWriter(allOperations: Seq[Operation]) {
 
-	val toSkip = Set("login", "describeSObject", "create", "update", "describeGlobal", "search", "retreive", "serverTimestamp")
+	val toSkip = Set("login", "describeSObject", "create", "update", "describeGlobal", "search", "retreive")
 	val operations = allOperations.filter(skipOperation(_))
 
 	def writeStubClass() {
