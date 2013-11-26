@@ -395,8 +395,7 @@ class Operation(val name: String, val description: String, val params: Seq[Opera
 		for (p <- params)
 			p.printAddElement(w);
 		val retStmt = returnType.accessor("deser", "result")
-		w.println(s"""|	[env endElement:@"${name}"];
-					 |	[env endElement:@"s:Body"];""".stripMargin('|'))
+		w.println(s"""	[env endElement:@"${name}"];""")
 		if (returnType.objcName == "void") {
 			w.println("""	[self sendRequest:[env end]];
 						|}
