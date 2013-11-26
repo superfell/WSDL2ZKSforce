@@ -370,20 +370,25 @@ class ZKDescribeSObject(xmlName:String, objcName:String, xmlNode:Node, fields:Se
 	override def baseClass(): String = { "ZKDescribeGlobalSObject" }
 	
 	override protected def writeHeaderIVars(w: SourceWriter) {
+		w.println("	NSArray 	 *fieldList;")
 		w.println("	NSDictionary *fieldsByName;")
 	}
 
 	override protected def writeImplFileBody(w: SourceWriter) {
 		w.println("""-(void)dealloc {
+					|	[fieldList release];
 					|	[fieldsByName release];
 					|	[super dealloc];
 					|}
 					|
 					|-(NSArray *)fields {
- 					|	NSArray *fa = [self complexTypeArrayFromElements:@"fields" cls:[ZKDescribeField class]];
-					|	for (ZKDescribeField *f in fa)
-					|		[f setSobject:self];
-					|	return fa;
+					|	if (fieldList == nil) {
+ 					|		NSArray *fa = [self complexTypeArrayFromElements:@"fields" cls:[ZKDescribeField class]];
+					|		for (ZKDescribeField *f in fa)
+					|			[f setSobject:self];
+					|		fieldList = [fa retain];
+					|	}
+					|	return fieldList;
 					|}
 					|""".stripMargin('|'));
 					
