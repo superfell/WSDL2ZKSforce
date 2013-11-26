@@ -160,13 +160,17 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 		val p = if (propType.isPointer) "*" else ""
 		s"$t$p$name"
 	}
+	
+	override def equals(other: Any): Boolean = {
+		other.isInstanceOf[ComplexTypeProperty] && (other.asInstanceOf[ComplexTypeProperty].name == name) && (other.asInstanceOf[ComplexTypeProperty].propType.objcName == propType.objcName)
+	}
 }
 
 object Direction extends Enumeration {
 	val Serialize, Deserialize = Value
 }
 
-class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, objcName, "", true) {
+class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, objcName, "", true) {
 	
 	val direction =  Direction.ValueSet.newBuilder
 
@@ -358,6 +362,34 @@ class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[
 		w.println()
 		super.writeImplFileBody(w)
 	}
+}
+
+class ZKDescribeSObject(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[ComplexTypeProperty]) extends OutputComplexTypeInfo(xmlName, objcName, xmlNode, fields) {
+
+	override def headerImportFile(): String = { "ZKDescribeGlobalSObject.h" }
+	override def baseClass(): String = { "ZKDescribeGlobalSObject" }
+	
+	override protected def writeHeaderIVars(w: SourceWriter) {
+		w.println("	NSDictionary *fieldsByName;")
+	}
+
+	override protected def writeImplFileBody(w: SourceWriter) {
+		w.println("""-(void)dealloc {
+					|	[fieldsByName release];
+					|	[super dealloc];
+					|}
+					|
+					|-(NSArray *)fields {
+ 					|	NSArray *fa = [self complexTypeArrayFromElements:@"fields" cls:[ZKDescribeField class]];
+					|	for (ZKDescribeField *f in fa)
+					|		[f setSobject:self];
+					|	return fa;
+					|}
+					|""".stripMargin('|'));
+					
+		for (f <- fields.filter(_.name != "fields"))
+			w.println(f.readImplBody)
+	}	
 }
 
 class VoidTypeInfo() extends TypeInfo("void", "void", "", false) {
@@ -607,18 +639,28 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	private def makeObjcName(xmlName: String): String = {
 		// There are some generated types that for legacy reasons we want to have a different name to the default name mapped from the wsdl
 		val newNames = Map(
-						// default Name		  -> name to use instead
-						"GetUserInfoResult" -> "ZKUserInfo",
-						"Field"	  		    -> "ZKDescribeField"
+						// default Name		  			-> name to use instead
+						"GetUserInfoResult" 			-> "ZKUserInfo",
+						"Field"	  		    			-> "ZKDescribeField",
+						"DescribeGlobalSObjectResult" 	-> "ZKDescribeGlobalSObject",
+						"DescribeSObjectResult"			-> "ZKDescribeSObject"
 						)
 		return newNames.getOrElse(xmlName, "ZK" + xmlName.capitalize)
 	}
 
 	private def defaultComplexType(dir: Direction.Value, xmlName: String, objcName: String, ct: Node, fields: Seq[ComplexTypeProperty]): ComplexTypeInfo = {
 		if (objcName == "ZKDescribeField")
-			new ZKDescribeField(xmlName, objcName, ct, fields);
+			new ZKDescribeField(xmlName, objcName, ct, fields)
+
+		else if (objcName == "ZKDescribeSObject") {
+			val dg = complexType("DescribeGlobalSObjectResult", Direction.Deserialize);
+			val childFields = fields.filter(!dg.fields.contains(_))
+			new ZKDescribeSObject(xmlName, objcName, ct, childFields)
+		}
+		
 		else if (dir == Direction.Serialize)
 			new InputComplexTypeInfo(xmlName, objcName, ct, fields) 
+
 		else
 			new OutputComplexTypeInfo(xmlName, objcName, ct, fields)
 	}
