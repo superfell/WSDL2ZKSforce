@@ -116,7 +116,9 @@ class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val 
 	}
 	
 	def serializerMethodName() : String = { 
-		if (objcName == "BOOL") "addBoolElement" else "addElement"
+		if (objcName == "BOOL") 			"addBoolElement" 
+		else if (objcName == "NSInteger") 	"addIntElement"
+		else 								"addElement"
 	}
 }
 
@@ -372,7 +374,7 @@ class OperationParameter(val name: String, val paramType: TypeInfo) {
 	}
 }
 
-class Operation(val name: String, val description: String, val params: Seq[OperationParameter], val returnType:TypeInfo) {
+class Operation(val name: String, val description: String, val params: Seq[OperationParameter], val returnType:TypeInfo, inputHeaders: Seq[String] ) {
 	
 	def objcSignature(): String = {
 		s"-(${returnType.fullTypeName})$name${paramList}"
@@ -390,7 +392,10 @@ class Operation(val name: String, val description: String, val params: Seq[Opera
 					|$objcSignature {
 					|	if (!authSource) return $nullValue;
 					|	[self checkSession];
-					|	ZKEnvelope *env = [[[ZKPartnerEnvelope alloc] initWithSessionHeader:[authSource sessionId] clientId:clientId] autorelease];
+					|	ZKEnvelope *env = [[[ZKPartnerEnvelope alloc] initWithSessionHeader:[authSource sessionId]] autorelease];""".stripMargin('|'))
+		for (h <- inputHeaders.filter(_ != "SessionHeader"))
+			w.println(s"	[self add${h}:env];")
+		w.println(s"""|	[env moveToBody];
 				    |	[env startElement:@"${name}"];""".stripMargin('|'));
 		for (p <- params)
 			p.printAddElement(w);
@@ -476,7 +481,9 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	private val complexTypes = collection.mutable.Map[String, ComplexTypeInfo]()
 	private val elements = createElements(wsdl)
 	private val simpleTypes = createSimpleTypes(wsdl)
+	private val bindingOperations = createBindingOperations(wsdl)
 	private val operations = collection.mutable.MutableList[Operation]()
+	private val headerNames = collection.mutable.MutableList[String]()
 	private val VOID = new VoidTypeInfo()
 	
 	val messages = createMessages(wsdl)
@@ -485,7 +492,28 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		val input = handleInputElement(inputElemName)
 		val output = handleOutputElement(outputElemName)
 		val opType = if (output.length > 0) output(0).propType else VOID
-		operations += new Operation(name, description, input.map(convertToParam(_)), opType)
+		// headers
+		val bindingOp = bindingOperations(inputElemName)
+		val headers = (bindingOp \ "input" \ "header").map(x => (
+			handleHeader(stripPrefix((x \ "@message").text), (x \ "@part").text)))
+
+		operations += new Operation(name, description, input.map(convertToParam(_)), opType, headers)
+	}
+	
+	def handleHeader(message:String, partName: String) : String = {
+		val msg = messages(message)
+		for (part <- msg \ "part") {
+			if ((part \ "@name").text == partName) {
+				val elmName = stripPrefix((part \ "@element").text)
+				val elm = elements(elmName)
+				if (!complexTypes.contains(elmName)) {
+					makeComplexType(elmName, (elm \ "complexType")(0), Direction.Serialize)
+					headerNames += elmName
+				}
+				return elmName
+			}
+		}
+		return null
 	}
 	
 	def handleInputElement(elementName: String): Seq[ComplexTypeProperty] = {
@@ -521,6 +549,8 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 			ct.writeHeaderFile()
 			ct.writeImplFile()
 		}
+		for (h <- headerNames)
+			println("Header " + h)
 	}
 	
     def writeZKSforceh() {
@@ -535,6 +565,10 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		for(f <- new File("../zkSforce/zkSforce").listFiles().filter(_.getName().contains("+")).filter(_.getName().endsWith(".h")))
 			w.printImport(f.getName())
 		w.close()
+	}
+	
+	private def createBindingOperations(wsdl: Elem): Map[String, Node] = {
+		(wsdl \ "binding" \ "operation").map(x => ((x \ "@name").text, x)).toMap
 	}
 	
 	private def createSimpleTypes(wsdl: Elem): Map[String, Node] = {
@@ -593,11 +627,15 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	
 	private def makeComplexType(xmlName: String, dir: Direction.Value): ComplexTypeInfo = {
 		val ct = complexTypeElems(xmlName)
+		makeComplexType(xmlName, ct, dir)
+	}
+	
+	private def makeComplexType(xmlName: String, complexType: Node, dir: Direction.Value): ComplexTypeInfo = {
 		val objcName = makeObjcName(xmlName)
 		// we insert a temporary version of the complexType to handle recursive definitions
-		complexTypes(xmlName) = new ComplexTypeInfo(xmlName, objcName, ct, List())
-		val fields = (ct \ "sequence" \ "element").map( x => generateField(x, dir) )
-		val i = defaultComplexType(dir, xmlName, objcName, ct, fields)
+		complexTypes(xmlName) = new ComplexTypeInfo(xmlName, objcName, complexType, List())
+		val fields = (complexType \ "sequence" \ "element").map( x => generateField(x, dir) )
+		val i = defaultComplexType(dir, xmlName, objcName, complexType, fields)
 		i.direction += dir
 		complexTypes(xmlName) = i
 		return i
