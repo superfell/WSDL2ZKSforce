@@ -132,6 +132,10 @@ class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.
 		else
 			s"""[$instanceName complexTypeArrayFromElements:@"$elemName" cls:[${componentType.objcName} class]]"""
 	}
+	
+	override def serializerMethodName(): String = { 
+		"addElementArray"
+	}
 }
 
 class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
