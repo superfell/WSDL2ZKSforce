@@ -195,12 +195,13 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo, val nillable
 		if (v) "YES" else "NO"
 	}
 	
-	def serializerMethod(instName: String, padTo:Integer, valueScope:String) : String = {
+	def serializerMethod(instName: String, padTo:Integer, padNameTo:Integer, valueScope:String) : String = {
 		val addMethod = propType.serializerMethodName
 		val pad = " ".padTo(padTo - addMethod.length - name.length, ' ')
 		val scope = if (valueScope.length > 0) valueScope + "." else ""
+		val namePad = "".padTo(padNameTo - name.length, ' ')
 		val extra = if (propType.serializerMethodName == "addElement") 
-						s" nillable:${objcBool(nillable)} optional:${objcBool(optional)}"
+						s"${namePad} nillable:${objcBool(nillable).padTo(3,' ')} optional:${objcBool(optional)}"
 					else
 						""
 		s"""\t[$instName ${propType.serializerMethodName}:@"$name"${pad}elemValue:$scope$name$extra];"""
@@ -295,6 +296,14 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fiel
 	}
 }
 
+def writeFieldSerializers(instName:String, valueScope:String, w:SourceWriter, fields:Seq[ComplexTypeProperty]) {
+	if (fields.length == 0) return;
+	val padTo = fields.map(_.serializerLength).max
+	val padNamesTo = fields.map(_.name.length).max
+	for (f <- fields)
+		w.println(f.serializerMethod(instName, padTo, padNamesTo, valueScope))
+}
+
 // A ComplexType from a message input, i.e. something we'll need to be able to serialize
 class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, objcName, xmlNode, fields) {
 
@@ -317,9 +326,7 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 		w.println("}")
 		w.println("-(void)serializeToEnvelope:(ZKEnvelope *)env elemName:(NSString *)elemName {")
 		w.println("\t[env startElement:elemName];")
-		val padTo = if (fields.length > 0) fields.map(_.serializerLength).max else 0
-		for (f <- fields)
-			w.println(f.serializerMethod("env", padTo.asInstanceOf[Integer], "self"))
+		writeFieldSerializers("env", "self", w, fields)
 		w.println("\t[env endElement:elemName];")
 		w.println("}")
 	} 
@@ -458,9 +465,7 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 			w.println(s"	[self add${h}:env];")
 		w.println(s"""|	[env moveToBody];
 				    |	[env startElement:@"${name}"];""".stripMargin('|'));
-		val padTo:Integer = if (params.size > 0) params.map(_.serializerLength).max else 0
-		for (p <- params)
-			w.println(p.serializerMethod("env", padTo, ""))
+		writeFieldSerializers("env", "", w, params)
 		val retStmt = returnType.accessor("deser", "result")
 		w.println(s"""	[env endElement:@"${name}"];""")
 		if (returnType.objcName == "void") {
