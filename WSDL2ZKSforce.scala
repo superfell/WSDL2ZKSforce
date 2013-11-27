@@ -27,6 +27,7 @@
 import scala.xml._
 import java.io._
 
+// Helper class for generating a new source code file.
 class SourceWriter(val file: File) {
 	val w = new PrintWriter(file)
 
@@ -101,32 +102,36 @@ class SourceWriter(val file: File) {
 	}
 }
 
+// Each mapping from an XML based Type to an Objective-C type we need to generate is represented by a TypeInfo
+// TypeInfo has a heirarchy for different types of types (e.g. arrays, classes, etc)
 class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val isPointer: Boolean) {
 	
+	// additional comment that'll get added to a property declaration of this type.
 	def propertyDeclComment(): String =  { "" }
 	
+	// what property flags should be used for this type.
 	def propertyFlags(): String = { if (isPointer) "retain" else "assign" }
 	
+	// full name of the objective-c type, includes * for pointer types.
 	def fullTypeName(): String = { if (isPointer) objcName + " *" else objcName }
 	
+	// returns true if this type is one we generated rather than a system type
 	def isGeneratedType(): Boolean = { objcName.startsWith("ZK") }	// TODO
 	
+	// returns an accessor that returns an instance of this type (when deserializing xml)
 	def accessor(instanceName: String, elemName: String): String = {
 		s"""[$instanceName $accessor:@"$elemName"]"""
 	}
 	
+	// returns the name of the method that is used to serialize an instance of this type
 	def serializerMethodName() : String = { 
 		if (objcName == "BOOL") 			"addBoolElement" 
 		else if (objcName == "NSInteger") 	"addIntElement"
 		else 								"addElement"
 	}
-	
-	def serializerMethodImpl(elemName:String, padNameTo:Integer, valParamName:String): String = {
-		val pad = " ".padTo(padNameTo - elemName.length, ' ')
-		s"""${serializerMethodName}:@"$elemName"${pad}elemValue:$valParamName"""
-	}
 }
 
+// For types that are mapped to Arrays.
 class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.xmlName, "NSArray", "", true) {
 
 	override def propertyDeclComment(): String =  { " // of " + componentType.objcName }
@@ -143,7 +148,8 @@ class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.
 	}
 }
 
-class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
+// A property of a complexType (aka Class)
+class ComplexTypeProperty(val name: String, val propType: TypeInfo, val nillable: Boolean, val optional:Boolean) {
 	
 	def readImplBody(): String =  {
 		s"""-(${propType.fullTypeName})$name {
@@ -164,6 +170,10 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 		s"\t$td;"
 	}
 	
+	def parameterDecl(): String = {
+		s"$name:(${propType.fullTypeName})$name"
+	}
+	
 	private def typeDef(padTypeTo: Int): String = {
 		val t = propType.objcName.padTo(padTypeTo - (if (propType.isPointer) 1 else 0), ' ')
 		val p = if (propType.isPointer) "*" else ""
@@ -171,7 +181,21 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo) {
 	}
 	
 	override def equals(other: Any): Boolean = {
-		other.isInstanceOf[ComplexTypeProperty] && (other.asInstanceOf[ComplexTypeProperty].name == name) && (other.asInstanceOf[ComplexTypeProperty].propType.objcName == propType.objcName)
+		if (!other.isInstanceOf[ComplexTypeProperty]) return false
+		val r = other.asInstanceOf[ComplexTypeProperty]
+		r.name == name && r.propType.objcName == propType.objcName
+	}
+	
+	// return the length of the serializer method name + the length of the element name, this is used to calc the right padding for a set of properties
+	def serializerLength():Integer = {
+		return propType.serializerMethodName.length + name.length + 1
+	}
+	
+	def serializerMethod(instName: String, padTo:Integer, valueScope:String) : String = {
+		val addMethod = propType.serializerMethodName
+		val pad = " ".padTo(padTo - addMethod.length - name.length, ' ')
+		val scope = if (valueScope.length > 0) valueScope + "." else ""
+		s"""\t[$instName ${propType.serializerMethodName}:@"$name"${pad}elemValue:$scope$name];"""
 	}
 }
 
@@ -179,6 +203,7 @@ object Direction extends Enumeration {
 	val Serialize, Deserialize = Value
 }
 
+// For types that are mapped from ComplexTypes (aka Classes)
 class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, objcName, "", true) {
 	
 	val direction =  Direction.ValueSet.newBuilder
@@ -270,10 +295,6 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 	override def includeIVarDecl(): Boolean = { true }
 	override def fieldsAreReadOnly(): Boolean = { false }
 	
-	private def addLength(f: ComplexTypeProperty): Int = {
-		f.name.length + f.propType.serializerMethodName.length
-	}
-	
 	override protected def writeImplImports(w: SourceWriter) {
 		w.printImport("zkEnvelope.h")
 	}
@@ -288,13 +309,9 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 		w.println("}")
 		w.println("-(void)serializeToEnvelope:(ZKEnvelope *)env elemName:(NSString *)elemName {")
 		w.println("\t[env startElement:elemName];")
-		val padTo = if (fields.length > 0) fields.map(addLength(_)).max else 0
-		for (f <- fields) {
-			val addMethod = f.propType.serializerMethodName
-			val pad = padTo - addMethod.length + 1
-			val elemVal = s"self.${f.name}"
-			w.println(s"\t[env ${f.propType.serializerMethodImpl(f.name,pad,elemVal)}];")
-		}
+		val padTo = if (fields.length > 0) fields.map(_.serializerLength).max else 0
+		for (f <- fields)
+			w.println(f.serializerMethod("env", padTo.asInstanceOf[Integer], "self"))
 		w.println("\t[env endElement:elemName];")
 		w.println("}")
 	} 
@@ -410,17 +427,7 @@ class VoidTypeInfo() extends TypeInfo("void", "void", "", false) {
 	override def accessor(instanceName:String, elemName:String) : String = { "" }
 }
 
-class OperationParameter(val name: String, val paramType: TypeInfo) {
-	def decl(): String = {
-		s"$name:(${paramType.fullTypeName})$name"
-	}
-	
-	def printAddElement(w: SourceWriter) {
-		w.println(s"""	[env ${paramType.serializerMethodImpl(name,1, name)}];""")
-	}
-}
-
-class Operation(val name: String, val description: String, val params: Seq[OperationParameter], val returnType:TypeInfo, inputHeaders: Seq[String] ) {
+class Operation(val name: String, val description: String, val params: Seq[ComplexTypeProperty], val returnType:TypeInfo, inputHeaders: Seq[String] ) {
 	
 	def objcSignature(): String = {
 		s"-(${returnType.fullTypeName})$name${paramList}"
@@ -443,8 +450,9 @@ class Operation(val name: String, val description: String, val params: Seq[Opera
 			w.println(s"	[self add${h}:env];")
 		w.println(s"""|	[env moveToBody];
 				    |	[env startElement:@"${name}"];""".stripMargin('|'));
+		val padTo:Integer = if (params.size > 0) params.map(_.serializerLength).max else 0
 		for (p <- params)
-			p.printAddElement(w);
+			w.println(p.serializerMethod("env", padTo, ""))
 		val retStmt = returnType.accessor("deser", "result")
 		w.println(s"""	[env endElement:@"${name}"];""")
 		if (returnType.objcName == "void") {
@@ -461,15 +469,15 @@ class Operation(val name: String, val description: String, val params: Seq[Opera
 	}
 	
 	def types():Seq[TypeInfo] = {
-		returnType +: params.map(_.paramType) 
+		returnType +: params.map(_.propType) 
 	}
 	
 	def paramList():String = {
 		if (params.length == 0) return ""
 		val fp = params(0)
-		val first = s":(${fp.paramType.fullTypeName})${fp.name}"
+		val first = s":(${fp.propType.fullTypeName})${fp.name}"
 		if (params.length == 1) return first
-		first + " " + params.tail.map(_.decl).mkString(" ")
+		first + " " + params.tail.map(_.parameterDecl).mkString(" ")
 	}
 }
 
@@ -543,7 +551,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		val headers = (bindingOp \ "input" \ "header").map(x => (
 			handleHeader(stripPrefix((x \ "@message").text), (x \ "@part").text)))
 
-		operations += new Operation(name, description, input.map(convertToParam(_)), opType, headers)
+		operations += new Operation(name, description, input, opType, headers)
 	}
 	
 	def handleHeader(message:String, partName: String) : String = {
@@ -568,10 +576,6 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	
 	def handleOutputElement(elementName: String): Seq[ComplexTypeProperty] = {
 		return handleElement(elementName, Direction.Deserialize)
-	}
-	
-	private def convertToParam(prop: ComplexTypeProperty): OperationParameter = {
-		return new OperationParameter(prop.name, prop.propType)
 	}
 	
 	private def handleElement(elementName: String, dir: Direction.Value): Seq[ComplexTypeProperty] = {
@@ -702,7 +706,9 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		val name = (field \ "@name").text
 		val singleType = getType(xmlt, dir)
 		val t = if (array) new ArrayTypeInfo(singleType) else singleType
-		new ComplexTypeProperty(name, t)
+		val optional = (field \ "@minOccurs").text == "0"
+		val nillable = (field \ "@nillable").text == "true"
+		new ComplexTypeProperty(name, t, nillable, optional)
 	}
 
 	private def getType(xmlName: String, dir: Direction.Value): TypeInfo = {
