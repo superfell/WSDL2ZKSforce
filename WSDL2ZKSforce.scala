@@ -191,11 +191,19 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo, val nillable
 		return propType.serializerMethodName.length + name.length + 1
 	}
 	
+	private def objcBool(v: Boolean): String = {
+		if (v) "YES" else "NO"
+	}
+	
 	def serializerMethod(instName: String, padTo:Integer, valueScope:String) : String = {
 		val addMethod = propType.serializerMethodName
 		val pad = " ".padTo(padTo - addMethod.length - name.length, ' ')
 		val scope = if (valueScope.length > 0) valueScope + "." else ""
-		s"""\t[$instName ${propType.serializerMethodName}:@"$name"${pad}elemValue:$scope$name];"""
+		val extra = if (propType.serializerMethodName == "addElement") 
+						s" nillable:${objcBool(nillable)} optional:${objcBool(optional)}"
+					else
+						""
+		s"""\t[$instName ${propType.serializerMethodName}:@"$name"${pad}elemValue:$scope$name$extra];"""
 	}
 }
 
