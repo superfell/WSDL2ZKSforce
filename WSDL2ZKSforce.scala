@@ -120,6 +120,11 @@ class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val 
 		else if (objcName == "NSInteger") 	"addIntElement"
 		else 								"addElement"
 	}
+	
+	def serializerMethodImpl(elemName:String, padNameTo:Integer, valParamName:String): String = {
+		val pad = " ".padTo(padNameTo - elemName.length, ' ')
+		s"""${serializerMethodName}:@"$elemName"${pad}elemValue:$valParamName"""
+	}
 }
 
 class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.xmlName, "NSArray", "", true) {
@@ -287,8 +292,8 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 		for (f <- fields) {
 			val addMethod = f.propType.serializerMethodName
 			val pad = padTo - addMethod.length + 1
-			val name = (f.name + "\"").padTo(pad, ' ')
-			w.println(s"""\t[env $addMethod:@"$name elemValue:self.${f.name}];""")
+			val elemVal = s"self.${f.name}"
+			w.println(s"\t[env ${f.propType.serializerMethodImpl(f.name,pad,elemVal)}];")
 		}
 		w.println("\t[env endElement:elemName];")
 		w.println("}")
@@ -411,7 +416,7 @@ class OperationParameter(val name: String, val paramType: TypeInfo) {
 	}
 	
 	def printAddElement(w: SourceWriter) {
-		w.println(s"""	[env ${paramType.serializerMethodName}:@"${name}" elemValue:${name}];""")
+		w.println(s"""	[env ${paramType.serializerMethodImpl(name,1, name)}];""")
 	}
 }
 
