@@ -495,11 +495,11 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 		val retStmt = returnType.accessor("deser", "result")
 		w.println(s"""	[env endElement:@"${name}"];""")
 		if (returnType.objcName == "void") {
-			w.println("""	[self sendRequest:[env end]];
+			w.println("""	[self sendRequest:[env end] name:NSStringFromSelector(_cmd)];
 						|}
 						|""".stripMargin('|'))
 		} else {
-			w.println(s"""	zkElement *rn = [self sendRequest:[env end]];
+			w.println(s"""	zkElement *rn = [self sendRequest:[env end] name:NSStringFromSelector(_cmd)];
 					 |	ZKXmlDeserializer *deser = [[[ZKXmlDeserializer alloc] initWithXmlElement:rn] autorelease];
 					 |	return $retStmt;
 					 |}
