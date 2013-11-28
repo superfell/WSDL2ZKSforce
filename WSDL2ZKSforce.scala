@@ -148,12 +148,21 @@ class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.
 	}
 }
 
+val reservedWords = Set("inline")
+
 // A property of a complexType (aka Class)
-class ComplexTypeProperty(val name: String, val propType: TypeInfo, val nillable: Boolean, val optional:Boolean) {
+class ComplexTypeProperty(name: String, val propType: TypeInfo, val nillable: Boolean, val optional:Boolean) {
+	
+	val elementName = name
+	val propertyName = makePropertyName(name)
+
+	private def makePropertyName(name:String) : String = {
+		if (reservedWords.contains(name)) "_" + name else name
+	}
 	
 	def readImplBody(): String =  {
-		s"""-(${propType.fullTypeName})$name {
-			|    return ${propType.accessor("self", name)};
+		s"""-(${propType.fullTypeName})$propertyName {
+			|    return ${propType.accessor("self", elementName)};
 			|}
 			""".stripMargin('|')
 	}
@@ -171,24 +180,24 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo, val nillable
 	}
 	
 	def parameterDecl(): String = {
-		s"$name:(${propType.fullTypeName})$name"
+		s"$propertyName:(${propType.fullTypeName})$propertyName"
 	}
 	
 	private def typeDef(padTypeTo: Int): String = {
 		val t = propType.objcName.padTo(padTypeTo - (if (propType.isPointer) 1 else 0), ' ')
 		val p = if (propType.isPointer) "*" else ""
-		s"$t$p$name"
+		s"$t$p$propertyName"
 	}
 	
 	override def equals(other: Any): Boolean = {
 		if (!other.isInstanceOf[ComplexTypeProperty]) return false
 		val r = other.asInstanceOf[ComplexTypeProperty]
-		r.name == name && r.propType.objcName == propType.objcName
+		r.propertyName == propertyName && r.propType.objcName == propType.objcName
 	}
 	
 	// return the length of the serializer method name + the length of the element name, this is used to calc the right padding for a set of properties
 	def serializerLength():Integer = {
-		return propType.serializerMethodName.length + name.length + 1
+		return propType.serializerMethodName.length + elementName.length + 1
 	}
 	
 	private def objcBool(v: Boolean): String = {
@@ -197,14 +206,14 @@ class ComplexTypeProperty(val name: String, val propType: TypeInfo, val nillable
 	
 	def serializerMethod(instName: String, padTo:Integer, padNameTo:Integer, valueScope:String) : String = {
 		val addMethod = propType.serializerMethodName
-		val pad = " ".padTo(padTo - addMethod.length - name.length, ' ')
+		val pad = " ".padTo(padTo - addMethod.length - elementName.length, ' ')
 		val scope = if (valueScope.length > 0) valueScope + "." else ""
-		val namePad = "".padTo(padNameTo - name.length, ' ')
+		val namePad = "".padTo(padNameTo - elementName.length, ' ')
 		val extra = if (propType.serializerMethodName == "addElement") 
 						s"${namePad} nillable:${objcBool(nillable).padTo(3,' ')} optional:${objcBool(optional)}"
 					else
 						""
-		s"""\t[$instName ${propType.serializerMethodName}:@"$name"${pad}elemValue:$scope$name$extra];"""
+		s"""\t[$instName ${propType.serializerMethodName}:@"$elementName"${pad}elemValue:$scope$propertyName$extra];"""
 	}
 }
 
@@ -299,7 +308,7 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fiel
 def writeFieldSerializers(instName:String, valueScope:String, w:SourceWriter, fields:Seq[ComplexTypeProperty]) {
 	if (fields.length == 0) return;
 	val padTo = fields.map(_.serializerLength).max
-	val padNamesTo = fields.map(_.name.length).max
+	val padNamesTo = fields.map(_.elementName.length).max
 	for (f <- fields)
 		w.println(f.serializerMethod(instName, padTo, padNamesTo, valueScope))
 }
@@ -325,11 +334,11 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 	}
 
 	override protected def writeImplFileBody(w: SourceWriter) {
-		w.println("@synthesize " + fields.map(_.name).mkString(", ") + ";")
+		w.println("@synthesize " + fields.map(_.propertyName).mkString(", ") + ";")
 		w.println()
 		w.println("-(void)dealloc {")
 		for (f <- fields.filter(_.propType.isPointer))
-			w.println(s"\t[${f.name} release];")
+			w.println(s"\t[${f.propertyName} release];")
 		w.println("\t[super dealloc];")
 		w.println("}")
 		w.println()
@@ -450,7 +459,7 @@ class ZKDescribeSObject(xmlName:String, objcName:String, xmlNode:Node, fields:Se
 					|}
 					|""".stripMargin('|'));
 					
-		for (f <- fields.filter(_.name != "fields"))
+		for (f <- fields.filter(_.propertyName != "fields"))
 			w.println(f.readImplBody)
 	}	
 }
@@ -505,7 +514,7 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 	def paramList():String = {
 		if (params.length == 0) return ""
 		val fp = params(0)
-		val first = s":(${fp.propType.fullTypeName})${fp.name}"
+		val first = s":(${fp.propType.fullTypeName})${fp.propertyName}"
 		if (params.length == 1) return first
 		first + " " + params.tail.map(_.parameterDecl).mkString(" ")
 	}
