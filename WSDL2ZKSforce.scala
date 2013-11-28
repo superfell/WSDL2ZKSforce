@@ -213,7 +213,7 @@ object Direction extends Enumeration {
 }
 
 // For types that are mapped from ComplexTypes (aka Classes)
-class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fields: Seq[ComplexTypeProperty]) extends TypeInfo(xmlName, objcName, "", true) {
+class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fields: Seq[ComplexTypeProperty], baseType:TypeInfo) extends TypeInfo(xmlName, objcName, "", true) {
 	
 	val direction =  Direction.ValueSet.newBuilder
 
@@ -227,8 +227,8 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fiel
 		s"""[[$instanceName complexTypeArrayFromElements:@"$elemName" cls:[${objcName} class]] lastObject]"""
 	}
 	
-	protected def headerImportFile(): String = { "" }
-	protected def baseClass(): String = { "" }
+	protected def headerImportFile(): String = { if (baseType == null) "" else baseType.objcName + ".h" }
+	protected def baseClass(): String = { if (baseType == null) "" else baseType.objcName }
 	protected def includeIVarDecl(): Boolean = { false }
 	protected def fieldsAreReadOnly(): Boolean = { true }
 	protected def implementNSCopying(): Boolean = { false }
@@ -305,10 +305,18 @@ def writeFieldSerializers(instName:String, valueScope:String, w:SourceWriter, fi
 }
 
 // A ComplexType from a message input, i.e. something we'll need to be able to serialize
-class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, objcName, xmlNode, fields) {
+class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty], baseType:TypeInfo) extends ComplexTypeInfo(xmlName, objcName, xmlNode, fields, baseType) {
 
-	override def headerImportFile(): String = { "ZKXMLSerializable.h" }
-	override def baseClass(): String = { "NSObject<ZKXMLSerializable>" }
+	override def headerImportFile(): String = { 
+		val s = super.headerImportFile
+		if (s == "") "ZKXMLSerializable.h" else s
+	}
+	
+	override def baseClass(): String = { 
+		val s = super.baseClass
+		if (s == "") "NSObject<ZKXMLSerializable>" else s
+	}
+	
 	override def includeIVarDecl(): Boolean = { true }
 	override def fieldsAreReadOnly(): Boolean = { false }
 	
@@ -324,19 +332,28 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 			w.println(s"\t[${f.name} release];")
 		w.println("\t[super dealloc];")
 		w.println("}")
+		w.println()
 		w.println("-(void)serializeToEnvelope:(ZKEnvelope *)env elemName:(NSString *)elemName {")
 		w.println("\t[env startElement:elemName];")
-		writeFieldSerializers("env", "self", w, fields)
+		val fieldsToSerialize = if (baseType == null) fields else (baseType.asInstanceOf[ComplexTypeInfo].fields) ++ fields
+		writeFieldSerializers("env", "self", w, fieldsToSerialize)
 		w.println("\t[env endElement:elemName];")
 		w.println("}")
 	} 
 }
 
 // A ComplexType from a message output, i.e. something we'll need to be able to deserialize
-class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty]) extends ComplexTypeInfo(xmlName, objcName, xmlNode, fields) {
+class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty], baseType:TypeInfo) extends ComplexTypeInfo(xmlName, objcName, xmlNode, fields, baseType) {
 	
-	override def headerImportFile(): String = { "zkXmlDeserializer.h" }
-	override def baseClass(): String = { "ZKXmlDeserializer" }
+	override def headerImportFile(): String = { 
+		val s = super.headerImportFile
+		if (s == "") "zkXmlDeserializer.h" else s
+	}
+	
+	override def baseClass(): String = { 
+		val s = super.baseClass
+		if (s == "") "ZKXmlDeserializer" else s
+	}
 	
 	override protected def writeImplImports(w: SourceWriter) {
 		w.printImports(fields.map(_.propType))
@@ -372,7 +389,7 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 	}
 }
 
-class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[ComplexTypeProperty]) extends OutputComplexTypeInfo(xmlName, objcName, xmlNode, fields) {
+class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[ComplexTypeProperty]) extends OutputComplexTypeInfo(xmlName, objcName, xmlNode, fields, null) {
 	
 	override protected def implementNSCopying(): Boolean = { true }
 	
@@ -405,7 +422,7 @@ class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[
 	}
 }
 
-class ZKDescribeSObject(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[ComplexTypeProperty]) extends OutputComplexTypeInfo(xmlName, objcName, xmlNode, fields) {
+class ZKDescribeSObject(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[ComplexTypeProperty]) extends OutputComplexTypeInfo(xmlName, objcName, xmlNode, fields, null) {
 
 	override def headerImportFile(): String = { "ZKDescribeGlobalSObject.h" }
 	override def baseClass(): String = { "ZKDescribeGlobalSObject" }
@@ -597,6 +614,25 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		return (element \ "complexType" \ "sequence" \ "element").map(generateField(_, dir))
 	}
 	
+	// some types are extensions of base types, and not found by the basic operation driven traversal
+	// so we need to go through and find these. (alternatively we could just create types for all complexTypes
+	// in the wsdl, think about doing that instead)
+	def addDerivedTypes() {
+		for (ct <- complexTypeElems.values) {
+			val name = (ct \ "@name").text
+			if (!complexTypes.contains(name)) {
+				val rawBaseName = (ct \ "complexContent" \ "extension" \ "@base").text
+				if (rawBaseName != null) {
+					val baseName = stripPrefix(rawBaseName)
+					if (complexTypes contains baseName) {
+						val baseType = complexTypes(baseName)
+						makeComplexType(name, baseType.direction.result.firstKey)
+					}
+				}	
+			}
+		}
+	}
+	
 	def complexType(xmlName: String, dir: Direction.Value) : ComplexTypeInfo = {
 		val t = complexTypes.getOrElse(xmlName, makeComplexType(xmlName, dir))
 		t.direction += dir
@@ -679,7 +715,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		return newNames.getOrElse(xmlName, "ZK" + xmlName.capitalize)
 	}
 
-	private def defaultComplexType(dir: Direction.Value, xmlName: String, objcName: String, ct: Node, fields: Seq[ComplexTypeProperty]): ComplexTypeInfo = {
+	private def defaultComplexType(dir: Direction.Value, xmlName: String, objcName: String, ct: Node, fields: Seq[ComplexTypeProperty], baseType: TypeInfo): ComplexTypeInfo = {
 		if (objcName == "ZKDescribeField")
 			new ZKDescribeField(xmlName, objcName, ct, fields)
 
@@ -690,10 +726,10 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		}
 		
 		else if (dir == Direction.Serialize)
-			new InputComplexTypeInfo(xmlName, objcName, ct, fields) 
+			new InputComplexTypeInfo(xmlName, objcName, ct, fields, baseType)
 
 		else
-			new OutputComplexTypeInfo(xmlName, objcName, ct, fields)
+			new OutputComplexTypeInfo(xmlName, objcName, ct, fields, baseType)
 	}
 	
 	private def makeComplexType(xmlName: String, dir: Direction.Value): ComplexTypeInfo = {
@@ -701,12 +737,15 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		makeComplexType(xmlName, ct, dir)
 	}
 	
-	private def makeComplexType(xmlName: String, complexType: Node, dir: Direction.Value): ComplexTypeInfo = {
+	private def makeComplexType(xmlName: String, complexTypeNode: Node, dir: Direction.Value): ComplexTypeInfo = {
 		val objcName = makeObjcName(xmlName)
 		// we insert a temporary version of the complexType to handle recursive definitions
-		complexTypes(xmlName) = new ComplexTypeInfo(xmlName, objcName, complexType, List())
-		val fields = (complexType \ "sequence" \ "element").map( x => generateField(x, dir) )
-		val i = defaultComplexType(dir, xmlName, objcName, complexType, fields)
+		complexTypes(xmlName) = new ComplexTypeInfo(xmlName, objcName, complexTypeNode, List(), null)
+		val base:String = stripPrefix((complexTypeNode \ "complexContent" \ "extension" \ "@base").text)
+		val baseType:TypeInfo = if (base.length > 0) complexType(base, dir) else null
+		val sequence = if (base.length > 0) (complexTypeNode \ "complexContent" \ "extension" \ "sequence") else (complexTypeNode \ "sequence")
+		val fields = (sequence \ "element").map( x => generateField(x, dir) )
+		val i = defaultComplexType(dir, xmlName, objcName, complexTypeNode, fields, baseType)
 		i.direction += dir
 		complexTypes(xmlName) = i
 		return i
@@ -769,6 +808,7 @@ object WSDL2ZKSforce {
 			schema.addOperation(opName, inElm, outElm, desc)
 		}
 
+		schema.addDerivedTypes()
 		schema.writeClientStub()
 		schema.writeTypes()
 		schema.writeZKSforceh()
