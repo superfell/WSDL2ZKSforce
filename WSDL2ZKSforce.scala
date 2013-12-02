@@ -520,25 +520,47 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 	}
 }
 
-class StubWriter(allOperations: Seq[Operation]) {
+class BaseStubWriter(val allOperations: Seq[Operation]) {
 
-	val toSkip = Set("login", "describeSObject", "create", "update", "describeGlobal", "search", "retreive")
-	val operations = allOperations.filter(skipOperation(_))
-
-	def writeStubClass() {
-		writeStubHeader()
-		writeStubImpl()
+	val operations = filterOps(allOperations);
+	
+	def filterOps(allOperations:Seq[Operation]) : Seq[Operation] = {
+		return allOperations;
 	}
 	
-	def skipOperation(op: Operation): Boolean = {
-		!toSkip.contains(op.name)
+	def writeClass() {
+		writeHeader()
+		writeImpl()
 	}
 	
 	def referencedTypes(): Set[TypeInfo] = {
 		Set(operations.map(_.types).flatten : _*)
 	}
 	
-	def writeStubHeader() {
+	def returnTypes(): Set[TypeInfo] = {
+		val rt = Set(operations.map(_.returnType) : _*)
+		val ordering = Ordering.fromLessThan[TypeInfo](_.objcName > _.objcName)
+		val ts = collection.immutable.TreeSet.empty[TypeInfo](ordering)
+		ts ++ rt
+	}
+	
+	def writeHeader() {
+		
+	}
+	
+	def writeImpl() {
+		
+	}
+}
+
+class SyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allOperations) {
+
+	override def filterOps(allOperations:Seq[Operation]) : Seq[Operation] = {
+		val toSkip = Set("login", "describeSObject", "create", "update", "describeGlobal", "search", "retreive")
+		allOperations.filter(x => !toSkip.contains(x.name))
+	}
+
+	override def writeHeader() {
 		val w= new SourceWriter(new File(new File("output"), "ZKSforceClient+Operations.h"))
 		w.printLicenseComment()
 		w.printImport("zkSforce.h")
@@ -554,7 +576,7 @@ class StubWriter(allOperations: Seq[Operation]) {
 		w.close()
 	}
 	
-	def writeStubImpl() {
+	override def writeImpl() {
 		val w = new SourceWriter(new File(new File("output"), "ZKSforceClient+Operations.m"))
 		w.printLicenseComment();
 		w.printImport("ZKSforceClient+Operations.h")
@@ -566,6 +588,50 @@ class StubWriter(allOperations: Seq[Operation]) {
 			op.writeMethodImpl(w)
 		w.println("@end")
 		w.close()
+	}
+}
+
+class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allOperations) {
+
+	override def writeHeader() {
+		val w = new SourceWriter(new File(new File("output"), "ZKSforceClient+zkAsyncQuery.h"))
+		w.printLicenseComment()
+		w.printImport("zkSforceClient.h")
+		w.println()
+		w.println("@interface ZKSforceClient (zkAsyncQuery)")
+		w.println()
+		val pad = returnTypes.map(blockType(_).length).max
+		for (rt <- returnTypes.filter(_.objcName != "void"))
+			printBlockTypeDef(w, blockType(rt), rt.fullTypeName, pad)
+		
+		printBlockTypeDef(w, "zkFailWithExceptionBlock", "NSException *", pad)
+		printBlockTypeDef(w, "zkCompleteVoidBlock", "void", pad)
+		w.println();
+		for (op <- operations) {
+			val cp = op.name.length + 15
+			w.println(s"""// ${op.description}
+						|-(void) perform${op.name.capitalize}${op.paramList}
+						|${" ".padTo(cp-9,' ')}failBlock:(zkFailWithExceptionBlock)failBlock
+						|${" ".padTo(cp-13,' ')}completeBlock:(${blockType(op.returnType)})completeBlock;
+						|""".stripMargin('|'))
+		}
+		
+		w.println("@end")
+		w.close()
+	}
+	
+	def printBlockTypeDef(w:SourceWriter, name:String, returnType:String, pad:Integer) {
+		val padding = " ".padTo(pad - name.length + 1, ' ')
+		val rt = if (returnType == "void") returnType else returnType+"result"
+		w.println(s"typedef void (^$name)$padding(${rt});")
+	}
+	
+	def blockType(t:TypeInfo) : String = {
+		return "zkComplete" + t.objcName.substring(2) + "Block"
+	}
+	
+	override def writeImpl() {
+		
 	}
 }
 
@@ -649,7 +715,8 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	}
 	
 	def writeClientStub() {
-		new StubWriter(operations).writeStubClass()
+		new SyncStubWriter(operations).writeClass()
+		new ASyncStubWriter(operations).writeClass()
 	}
 	
 	def writeTypes() {
