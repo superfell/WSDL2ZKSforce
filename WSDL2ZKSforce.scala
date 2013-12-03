@@ -672,39 +672,57 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				|	return YES;
 				|}
 				|
+				|
 				|// This method implements the meat of all the perform* calls,
-				|// it handles making the relevant call in a background thread/queue, 
+				|// it handles making the relevant call in any desired queue, 
 				|// and then calling the fail or complete block on the UI thread.
-				|// You don't appear to be able to have generic type'd blocks
-				|// so the perform* methods all have shim completeBlock to cast 
-				|// back to the relevant type from NSObject * that's used here.
 				|//
-				|-(void)performRequest:(NSObject * (^)(void))requestBlock
-				|		  checkSession:(BOOL)checkSession
+				|-(void)performRequest:(id (^)(void))requestBlock
+				|         checkSession:(BOOL)checkSession
 				|            failBlock:(zkFailWithExceptionBlock)failBlock 
-				|        completeBlock:(void (^)(NSObject *))completeBlock {
+				|        completeBlock:(void (^)(id))completeBlock
+				|                queue:(dispatch_queue_t)queue {
+				|
+				|    if (!requestBlock) return;
 				|
 				|    // sanity check that we're actually logged in and ready to go.
 				|    if (checkSession && (![self confirmLoggedIn])) return;
 				|
-				|   // run this block async on the default queue
-				|    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0), ^(void) {
+				|    // run this block async on the desired queue
+				|    dispatch_async(queue, ^{
 				|        @try {
-				|            NSObject *result = requestBlock();
+				|            id result = requestBlock();
 				|            // run the completeBlock on the main thread.
-				|            dispatch_async(dispatch_get_main_queue(), ^(void) {            
-				|                completeBlock(result);
-				|            });
+				|            if (completeBlock) {
+				|                dispatch_async(dispatch_get_main_queue(), ^{            
+				|                    completeBlock(result);
+				|                });
+				|            }
 				|
 				|        } @catch (NSException *ex) {
 				|           // run the failBlock on the main thread.
 				|            if (failBlock) {
-				|                dispatch_async(dispatch_get_main_queue(), ^(void) {
+				|                dispatch_async(dispatch_get_main_queue(), ^{
 				|                    failBlock(ex);
 				|                });
 				|            }
 				|        }
 				|	});
+				|}
+				|
+				|// Perform an asynchronous API call. 
+				|// Defaults to the default background global queue.
+				|//
+				|-(void)performRequest:(id (^)(void))requestBlock
+				|         checkSession:(BOOL)checkSession
+				|            failBlock:(zkFailWithExceptionBlock)failBlock 
+				|        completeBlock:(void (^)(id))completeBlock {
+				|
+				|    [self performRequest:requestBlock
+				|            checkSession:checkSession
+				|               failBlock:failBlock
+				|           completeBlock:completeBlock
+				|                   queue:dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0)];
 				|}
 				|""".stripMargin('|'))
 		for (op <- operations) {
@@ -714,12 +732,12 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 			val checkSession = if (op.inputHeaders.contains("SessionHeader")) "YES" else "NO"
 			w.println(op.blockMethodSignature + " {")
 			w.println(s"""
-						|	[self performRequest:^NSObject *(void) {
+						|	[self performRequest:^id(void) {
 						|			$call
 						|		}
 						|		 checkSession:$checkSession
 						|		    failBlock:failBlock
-						|		completeBlock:^(NSObject *r) {
+						|		completeBlock:^(id r) {
 						|			if (completeBlock) $completeBlock;
 						|		}];
 						|}
