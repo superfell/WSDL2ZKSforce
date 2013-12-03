@@ -831,7 +831,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
     def writeZKSforceh() {
 		val w = new SourceWriter(new File(new File("output"), "zkSforce.h"))
 		w.printLicenseComment()
-		val fixedImports = List("zkSforceClient.h", "zkSObject.h", "zkSoapException.h")
+		val fixedImports = List("zkSforceClient.h", "zkSObject.h", "zkSoapException.h", "ZKLimitInfoHeader.h", "ZKLimitInfo.h")
 		for (i <- fixedImports)
 			w.printImport(i)
 		w.printImports(complexTypes.values)
