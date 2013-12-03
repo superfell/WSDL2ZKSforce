@@ -477,7 +477,7 @@ class VoidTypeInfo() extends TypeInfo("void", "void", "", false) {
 	}
 }
 
-class Operation(val name: String, val description: String, val params: Seq[ComplexTypeProperty], val returnType:TypeInfo, inputHeaders: Seq[String] ) {
+class Operation(val name: String, val description: String, val params: Seq[ComplexTypeProperty], val returnType:TypeInfo, val inputHeaders: Seq[String] ) {
 	
 	def objcSignature(): String = {
 		s"-(${returnType.fullTypeName})$name${paramList}"
@@ -666,6 +666,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				|	}
 				|	return YES;
 				|}
+				|
 				|// This method implements the meat of all the perform* calls,
 				|// it handles making the relevant call in a background thread/queue, 
 				|// and then calling the fail or complete block on the UI thread.
@@ -673,12 +674,13 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				|// so the perform* methods all have shim completeBlock to cast 
 				|// back to the relevant type from NSObject * that's used here.
 				|//
-				|-(void)performRequest:(NSObject * (^)(void))requestBlock 
+				|-(void)performRequest:(NSObject * (^)(void))requestBlock
+				|		  checkSession:(BOOL)checkSession
 				|            failBlock:(zkFailWithExceptionBlock)failBlock 
 				|        completeBlock:(void (^)(NSObject *))completeBlock {
 				|
 				|    // sanity check that we're actually logged in and ready to go.
-				|    if (![self confirmLoggedIn]) return;
+				|    if (checkSession && (![self confirmLoggedIn])) return;
 				|
 				|   // run this block async on the default queue
 				|    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0), ^(void) {
@@ -704,11 +706,13 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 			val syncCall = s"[self ${op.name}${op.callSyncParamList}];"
 			val call = if (op.returnType.objcName == "void") syncCall + "\n			return nil;" else "return " + syncCall
 			val completeBlock = if (op.returnType.objcName == "void") "completeBlock()" else s"completeBlock((${op.returnType.fullTypeName})r)"
+			val checkSession = if (op.inputHeaders.contains("SessionHeader")) "YES" else "NO"
 			w.println(op.blockMethodSignature + " {")
 			w.println(s"""
 						|	[self performRequest:^NSObject *(void) {
 						|			$call
 						|		}
+						|		 checkSession:$checkSession
 						|		    failBlock:failBlock
 						|		completeBlock:^(NSObject *r) {
 						|			if (completeBlock) $completeBlock;
