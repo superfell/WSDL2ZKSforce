@@ -737,12 +737,21 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	def addOperation(name: String, inputElemName: String, outputElemName: String, description: String) {
 		val input = handleInputElement(inputElemName)
 		val output = handleOutputElement(outputElemName)
-		val opType = if (output.length > 0) output(0).propType else VOID
+		var opType = if (output.length > 0) output(0).propType else VOID
 		// headers
 		val bindingOp = bindingOperations(inputElemName)
 		val headers = (bindingOp \ "input" \ "header").map(x => (
 			handleHeader(stripPrefix((x \ "@message").text), (x \ "@part").text)))
 
+		// some of the manually written operations have different return types to what's in the WSDL
+		// so we need to fix up our metadata for that
+		if (name == "describeGlobal")
+			opType = new ArrayTypeInfo(getType("DescribeGlobalSObjectResult", Direction.Deserialize))
+		if (name == "search")
+			opType = new ArrayTypeInfo(getType("sObject", Direction.Deserialize))
+		if (name == "retrieve")
+			opType = new TypeInfo("dict", "NSDictionary", "", true)
+			
 		operations += new Operation(name, description, input, opType, headers)
 	}
 	
