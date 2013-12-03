@@ -129,6 +129,11 @@ class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val 
 		else if (objcName == "NSInteger") 	"addIntElement"
 		else 								"addElement"
 	}
+	
+	// type name for use with blocks
+	def blockTypeName() : String = {
+		return "zkComplete" + objcName.substring(2) + "Block"
+	}
 }
 
 // For types that are mapped to Arrays.
@@ -466,6 +471,10 @@ class ZKDescribeSObject(xmlName:String, objcName:String, xmlNode:Node, fields:Se
 
 class VoidTypeInfo() extends TypeInfo("void", "void", "", false) {
 	override def accessor(instanceName:String, elemName:String) : String = { "" }
+	
+	override def blockTypeName() : String = {
+		return "zkCompleteVoidBlock"
+	}
 }
 
 class Operation(val name: String, val description: String, val params: Seq[ComplexTypeProperty], val returnType:TypeInfo, inputHeaders: Seq[String] ) {
@@ -517,6 +526,28 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 		val first = s":(${fp.propType.fullTypeName})${fp.propertyName}"
 		if (params.length == 1) return first
 		first + " " + params.tail.map(_.parameterDecl).mkString(" ")
+	}
+	
+	// what we'd need to call teh sync version of this operation, e.g. :soql or :soql foo:bar
+	def callSyncParamList():String = {
+		if (params.length == 0) return ""
+		val fp = params(0)
+		val first = s":${fp.propertyName}"
+		if (params.length == 1) return first;
+		first + params.tail.map(x => (" " + x.propertyName + ":" + x.propertyName)).mkString(" ");
+	}
+	
+	def blockMethodSignature():String = {
+		val cp = name.length + 15
+		if (params.length == 0)
+			s"""// ${description}
+				|-(void) perform${name.capitalize}WithFailBlock:(zkFailWithExceptionBlock)failBlock
+				|${" ".padTo(cp-13,' ')}completeBlock:(${returnType.blockTypeName})completeBlock""".stripMargin('|')
+		else
+			s"""// ${description}
+				|-(void) perform${name.capitalize}${paramList}
+				|${" ".padTo(cp-9,' ')}failBlock:(zkFailWithExceptionBlock)failBlock
+				|${" ".padTo(cp-13,' ')}completeBlock:(${returnType.blockTypeName})completeBlock""".stripMargin('|')
 	}
 }
 
@@ -596,26 +627,21 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 	override def writeHeader() {
 		val w = new SourceWriter(new File(new File("output"), "ZKSforceClient+zkAsyncQuery.h"))
 		w.printLicenseComment()
-		w.printImport("zkSforceClient.h")
+		w.printImport("zkSforceClient+Operations.h")
 		w.println()
 		w.println("@interface ZKSforceClient (zkAsyncQuery)")
 		w.println()
-		val pad = returnTypes.map(blockType(_).length).max
+		val pad = returnTypes.map(_.blockTypeName.length).max
 		for (rt <- returnTypes.filter(_.objcName != "void"))
-			printBlockTypeDef(w, blockType(rt), rt.fullTypeName, pad)
+			printBlockTypeDef(w, rt.blockTypeName, rt.fullTypeName, pad)
 		
 		printBlockTypeDef(w, "zkFailWithExceptionBlock", "NSException *", pad)
 		printBlockTypeDef(w, "zkCompleteVoidBlock", "void", pad)
 		w.println();
 		for (op <- operations) {
-			val cp = op.name.length + 15
-			w.println(s"""// ${op.description}
-						|-(void) perform${op.name.capitalize}${op.paramList}
-						|${" ".padTo(cp-9,' ')}failBlock:(zkFailWithExceptionBlock)failBlock
-						|${" ".padTo(cp-13,' ')}completeBlock:(${blockType(op.returnType)})completeBlock;
-						|""".stripMargin('|'))
+			w.println(op.blockMethodSignature +";")
+			w.println()
 		}
-		
 		w.println("@end")
 		w.close()
 	}
@@ -626,12 +652,73 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 		w.println(s"typedef void (^$name)$padding(${rt});")
 	}
 	
-	def blockType(t:TypeInfo) : String = {
-		return "zkComplete" + t.objcName.substring(2) + "Block"
-	}
-	
 	override def writeImpl() {
-		
+		val w = new SourceWriter(new File(new File("output"), "ZKSforceClient+zkAsyncQuery.m"))
+		w.printLicenseComment()
+		w.printImport("ZKSforceClient+zkAsyncQuery.h")
+		w.println()
+		w.println(s"""@implementation ZKSforceClient (zkAsyncQuery)
+				|
+				|-(BOOL)confirmLoggedIn {
+				|	if (![self loggedIn]) {
+				|		NSLog(@"ZKSforceClient does not have a valid session. request not executed");
+				|		return NO;
+				|	}
+				|	return YES;
+				|}
+				|// This method implements the meat of all the perform* calls,
+				|// it handles making the relevant call in a background thread/queue, 
+				|// and then calling the fail or complete block on the UI thread.
+				|// You don't appear to be able to have generic type'd blocks
+				|// so the perform* methods all have shim completeBlock to cast 
+				|// back to the relevant type from NSObject * that's used here.
+				|//
+				|-(void)performRequest:(NSObject * (^)(void))requestBlock 
+				|            failBlock:(zkFailWithExceptionBlock)failBlock 
+				|        completeBlock:(void (^)(NSObject *))completeBlock {
+				|
+				|    // sanity check that we're actually logged in and ready to go.
+				|    if (![self confirmLoggedIn]) return;
+				|
+				|   // run this block async on the default queue
+				|    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0), ^(void) {
+				|        @try {
+				|            NSObject *result = requestBlock();
+				|            // run the completeBlock on the main thread.
+				|            dispatch_async(dispatch_get_main_queue(), ^(void) {            
+				|                completeBlock(result);
+				|            });
+				|
+				|        } @catch (NSException *ex) {
+				|           // run the failBlock on the main thread.
+				|            if (failBlock) {
+				|                dispatch_async(dispatch_get_main_queue(), ^(void) {
+				|                    failBlock(ex);
+				|                });
+				|            }
+				|        }
+				|	});
+				|}
+				|""".stripMargin('|'))
+		for (op <- operations) {
+			val syncCall = s"[self ${op.name}${op.callSyncParamList}];"
+			val call = if (op.returnType.objcName == "void") syncCall + "\n			return nil;" else "return " + syncCall
+			val completeBlock = if (op.returnType.objcName == "void") "completeBlock()" else s"completeBlock((${op.returnType.fullTypeName})r)"
+			w.println(op.blockMethodSignature + " {")
+			w.println(s"""
+						|	[self performRequest:^NSObject *(void) {
+						|			$call
+						|		}
+						|		    failBlock:failBlock
+						|		completeBlock:^(NSObject *r) {
+						|			if (completeBlock) $completeBlock;
+						|		}];
+						|}
+						|""".stripMargin('|'))
+
+		}
+		w.println("@end");
+		w.close()
 	}
 }
 
