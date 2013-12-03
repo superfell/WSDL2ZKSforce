@@ -599,7 +599,7 @@ class SyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allOp
 	override def writeHeader() {
 		val w= new SourceWriter(new File(new File("output"), "ZKSforceClient+Operations.h"))
 		w.printLicenseComment()
-		w.printImport("zkSforce.h")
+		w.printImport("zkSforceClient.h")
 		w.println()
 		val rts = collection.immutable.TreeSet.empty[String] ++ referencedTypes.filter(_.isGeneratedType).map(_.objcName)
 		for (t <- rts)
