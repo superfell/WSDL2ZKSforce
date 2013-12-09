@@ -677,7 +677,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				|// it handles making the relevant call in any desired queue, 
 				|// and then calling the fail or complete block on the UI thread.
 				|//
-				|-(void)performRequest:(id (^)(void))requestBlock
+				|-(void)performRequest:(id (^)())requestBlock
 				|         checkSession:(BOOL)checkSession
 				|            failBlock:(zkFailWithExceptionBlock)failBlock 
 				|        completeBlock:(void (^)(id))completeBlock
@@ -690,30 +690,34 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				|
 				|    // run this block async on the desired queue
 				|    dispatch_async(queue, ^{
+				|        id result;
+				|				
 				|        @try {
-				|            id result = requestBlock();
-				|            // run the completeBlock on the main thread.
-				|            if (completeBlock) {
-				|                dispatch_async(dispatch_get_main_queue(), ^{            
-				|                    completeBlock(result);
-				|                });
-				|            }
-				|
+				|            result = requestBlock();
 				|        } @catch (NSException *ex) {
-				|           // run the failBlock on the main thread.
+				|            // run the failBlock on the main thread.
 				|            if (failBlock) {
 				|                dispatch_async(dispatch_get_main_queue(), ^{
 				|                    failBlock(ex);
 				|                });
 				|            }
+				|
+				|            return;
 				|        }
-				|	});
+				|
+				|        // run the completeBlock on the main thread.
+				|        if (completeBlock) {
+				|            dispatch_async(dispatch_get_main_queue(), ^{            
+				|                completeBlock(result);
+				|            });
+				|        }
+				|    });
 				|}
 				|
 				|// Perform an asynchronous API call. 
 				|// Defaults to the default background global queue.
 				|//
-				|-(void)performRequest:(id (^)(void))requestBlock
+				|-(void)performRequest:(id (^)())requestBlock
 				|         checkSession:(BOOL)checkSession
 				|            failBlock:(zkFailWithExceptionBlock)failBlock 
 				|        completeBlock:(void (^)(id))completeBlock {
@@ -732,7 +736,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 			val checkSession = if (op.inputHeaders.contains("SessionHeader")) "YES" else "NO"
 			w.println(op.blockMethodSignature + " {")
 			w.println(s"""
-						|	[self performRequest:^id(void) {
+						|	[self performRequest:^id {
 						|			$call
 						|		}
 						|		 checkSession:$checkSession
