@@ -1,4 +1,4 @@
-// Copyright (c) 2013 Simon Fell
+// Copyright (c) 2013-2014 Simon Fell
 //
 // Permission is hereby granted, free of charge, to any person obtaining a 
 // copy of this software and associated documentation files (the "Software"), 
@@ -818,7 +818,9 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	
 	// some types are extensions of base types, and not found by the basic operation driven traversal
 	// so we need to go through and find these. (alternatively we could just create types for all complexTypes
-	// in the wsdl, think about doing that instead)
+	// in the wsdl, think about doing that instead. The problem with that is currently different types
+	// are generated for output vs input, we'd need to be able to have one base type that we can generate
+	// regardless of whether its used for input or output to do that).
 	def addDerivedTypes() {
 		for (ct <- complexTypeElems.values) {
 			val name = (ct \ "@name").text
@@ -988,6 +990,7 @@ object WSDL2ZKSforce {
 		val types = Map(
 					"string" 		-> new TypeInfo("string", 		"NSString",  	"string",  		true),
 					"int" 	 		-> new TypeInfo("int",    		"NSInteger", 	"integer", 		false),
+					"double"		-> new TypeInfo("double",		"double",		"double",		false),
 					"boolean"		-> new TypeInfo("boolean", 		"BOOL", 	 	"boolean", 		false),
 					"ID"	 		-> new TypeInfo("ID",			"NSString",  	"string",  		true),
 					"sObject"		-> new TypeInfo("sObject", 		"ZKSObject", 	"sObject",  	true),
@@ -1010,7 +1013,9 @@ object WSDL2ZKSforce {
 			println(opName.padTo(40, ' ') + inElm.padTo(40, ' ' ) + outElm)
 			schema.addOperation(opName, inElm, outElm, desc)
 		}
-
+		// currently we need to explictly add this, as its not reachable via just traversing the schema
+		schema.complexType("address", Direction.Deserialize)
+		
 		schema.addDerivedTypes()
 		schema.writeClientStub()
 		schema.writeTypes()
