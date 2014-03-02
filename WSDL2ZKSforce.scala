@@ -181,7 +181,9 @@ class ComplexTypeProperty(name: String, val propType: TypeInfo, val nillable: Bo
 		val f = if (readOnly) "readonly" else propType.propertyFlags
 		val comment = propType.propertyDeclComment
 		val td = typeDef(padTypeTo)
-		s"@property ($f) $td; $comment"
+		val nr = if (propertyName.startsWith("new")) " NS_RETURNS_NOT_RETAINED" else ""
+		var nrc = if (nr.length > 0) "; returns an autoreleased object, doesn't follow cocoa rules for properties/method starting with 'new'" else ""
+		s"@property ($f) $td$nr; $comment$nrc"
 	}
 	
 	def ivarDecl(padTypeTo: Int): String = {
