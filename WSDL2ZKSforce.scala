@@ -429,6 +429,7 @@ class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[
 	
 	override protected def writeImplImports(w: SourceWriter) {
 		w.printImport("ZKDescribeSObject.h")
+		w.printImport("zkParser.h")
 		super.writeImplImports(w)
 	}
 	
