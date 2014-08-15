@@ -867,7 +867,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		for (i <- fixedImports)
 			w.printImport(i)
 		w.printImports(complexTypes.values)
-		for(f <- new File("../zkSforce/zkSforce").listFiles().filter(_.getName().contains("+")).filter(_.getName().endsWith(".h")))
+		for(f <- new File("./output").listFiles().filter(_.getName().contains("+")).filter(_.getName().endsWith(".h")))
 			w.printImport(f.getName())
 		w.close()
 	}
