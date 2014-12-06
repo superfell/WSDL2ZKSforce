@@ -132,6 +132,7 @@ class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val 
 	def serializerMethodName() : String = { 
 		if (objcName == "BOOL") 			"addBoolElement" 
 		else if (objcName == "NSInteger") 	"addIntElement"
+		else if (objcName == "double")      "addDoubleElement"
 		else 								"addElement"
 	}
 	
@@ -168,6 +169,11 @@ class ComplexTypeProperty(name: String, val propType: TypeInfo, val nillable: Bo
 
 	private def makePropertyName(name:String) : String = {
 		if (reservedWords.contains(name)) "_" + name else name
+	}
+	
+	def initializer(nameOfZKElementInstance: String): String = {
+	    val zke =nameOfZKElementInstance
+	    s"\tself.$propertyName = ${propType.accessor(zke, elementName)};"
 	}
 	
 	def readImplBody(): String =  {
@@ -238,10 +244,25 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fiel
 	
 	val direction =  Direction.ValueSet.newBuilder
 
-	private def validate() {
+    def prevalidate() {
+        // if we're In & Out, we need our bass classes to also be in/out
+        val dir = direction.result();
+		if (dir.contains(Direction.Deserialize) && dir.contains(Direction.Serialize)) {
+		    if (baseType != null) {
+		        baseType match {
+		            case c: ComplexTypeInfo => { c.direction += Direction.Serialize; c.direction += Direction.Deserialize; c.prevalidate(); }
+		        }
+	        }
+	    }
+    }
+    
+	def validate(): ComplexTypeInfo = {
 		val dir = direction.result()
-		if (dir.contains(Direction.Deserialize) && dir.contains(Direction.Serialize))
-			throw new RuntimeException("complexType with both serialization & deserialization not supported")
+		if (dir.contains(Direction.Deserialize) && dir.contains(Direction.Serialize)) {
+		    print(s"Promoting type $xmlName to an InputOutputComplexType\n")
+		    return new InputOutputComplexTypeInfo(xmlName, objcName, xmlNode, fields, baseType)
+		}
+        this
 	}
 	
 	override def accessor(instanceName:String, elemName: String): String = {
@@ -255,8 +276,6 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fiel
 	protected def implementNSCopying(): Boolean = { false }
 	
 	def writeHeaderFile() {
-		validate()
-
 		val hfile = new File(new File("output"), objcName + ".h")
 		hfile.getParentFile().mkdirs()
 		val h = new SourceWriter(hfile)
@@ -345,14 +364,18 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 		w.printImport("zkEnvelope.h")
 	}
 
-	override protected def writeImplFileBody(w: SourceWriter) {
-		w.println("@synthesize " + fields.map(_.propertyName).mkString(", ") + ";")
+    protected def writeDeallocImpl(w: SourceWriter) {
 		w.println()
 		w.println("-(void)dealloc {")
 		for (f <- fields.filter(_.propType.isPointer))
 			w.println(s"\t[${f.propertyName} release];")
 		w.println("\t[super dealloc];")
 		w.println("}")
+    }
+    
+	override protected def writeImplFileBody(w: SourceWriter) {
+		w.println("@synthesize " + fields.map(_.propertyName).mkString(", ") + ";")
+		writeDeallocImpl(w);
 		w.println()
 		w.println("-(void)serializeToEnvelope:(ZKEnvelope *)env elemName:(NSString *)elemName {")
 		w.println("\t[env startElement:elemName];")
@@ -408,6 +431,52 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 		for (f <- fields)
 			w.println(f.readImplBody)
 	}
+}
+
+class InputOutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty], baseType:TypeInfo) extends InputComplexTypeInfo(xmlName, objcName, xmlNode, fields, baseType) {
+    
+    override protected def writeForwardDecls(w: SourceWriter) {
+        w.printClassForwardDecl("ZKXmlDeserializer");
+        w.printClassForwardDecl("zkElement");
+	}
+	
+    override protected def writeHeaderProperties(w: SourceWriter) {
+        w.println("-(id)init;")
+        w.println("-(id)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d;");
+        w.println("-(id)initWithXmlElement:(zkElement *)e;")
+        w.println();
+        super.writeHeaderProperties(w);
+    }
+    
+    override protected def writeImplImports(w: SourceWriter) {
+		super.writeImplImports(w)
+		w.printImport("ZKXmlDeserializer.h")
+		w.printImport("zkParser.h")
+	}
+	
+    override protected def writeDeallocImpl(w: SourceWriter) {
+        w.println()
+        w.println("-(id)init {")
+        w.println("    self = [super init];")
+        w.println("    return self;")
+        w.println("}")
+        w.println()
+        w.println("-(id)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d {")
+        if (baseType == null)
+            w.println("    self = [super init];")
+        else
+            w.println("    self = [super initWithZKXmlDeserializer:d];")
+        for (f <- fields)
+            w.println(f.initializer("d"));
+        w.println("    return self;")
+        w.println("}")
+        w.println()
+        w.println("-(id)initWithXmlElement:(zkElement *)e {")
+        w.println("    ZKXmlDeserializer *d = [[[ZKXmlDeserializer alloc] initWithXmlElement:e] autorelease];")
+        w.println("    return [self initWithZKXmlDeserializer:d];")
+        w.println("}")
+        super.writeDeallocImpl(w)
+    }
 }
 
 class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[ComplexTypeProperty]) extends OutputComplexTypeInfo(xmlName, objcName, xmlNode, fields, null) {
@@ -852,9 +921,13 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	}
 	
 	def writeTypes() {
+	    for ((_, ct) <- complexTypes) {
+	        ct.prevalidate();
+	    }
 		for ((_, ct) <- complexTypes) {
-			ct.writeHeaderFile()
-			ct.writeImplFile()
+		    val finalType = ct.validate();
+			finalType.writeHeaderFile()
+			finalType.writeImplFile()
 		}
 		for (h <- headerNames)
 			println("Header " + h)
@@ -1017,7 +1090,7 @@ object WSDL2ZKSforce {
 			schema.addOperation(opName, inElm, outElm, desc)
 		}
 		// currently we need to explictly add this, as its not reachable via just traversing the schema
-		schema.complexType("address", Direction.Deserialize)
+		schema.complexType("address", Direction.Deserialize).direction += Direction.Serialize
 		
 		schema.addDerivedTypes()
 		schema.writeClientStub()
