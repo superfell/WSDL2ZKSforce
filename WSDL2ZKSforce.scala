@@ -378,7 +378,11 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 		writeDeallocImpl(w);
 		w.println()
 		w.println("-(void)serializeToEnvelope:(ZKEnvelope *)env elemName:(NSString *)elemName {")
-		w.println("\t[env startElement:elemName];")
+		// if there's a baseType, then this is an extension type, and we need to serialize our type out as an xsi:type attribute
+		if (baseType == null)
+		    w.println("\t[env startElement:elemName];")
+		else
+		    w.println("\t[env startElement:elemName type:@\"" + xmlName + "\"];")
 		val fieldsToSerialize = if (baseType == null) fields else (baseType.asInstanceOf[ComplexTypeInfo].fields) ++ fields
 		writeFieldSerializers("env", "self", w, fieldsToSerialize)
 		w.println("\t[env endElement:elemName];")
