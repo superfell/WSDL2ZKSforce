@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Salesforce.com Partner Web Services API Version 32.0
-Generated on 2014-09-20 16:09:47 +0000.
+Salesforce.com Partner Web Services API Version 33.0
+Generated on 2015-02-21 22:04:43 +0000.
 
-Copyright 1999-2014 salesforce.com, inc.
+Copyright 1999-2015 salesforce.com, inc.
 All Rights Reserved
 -->
 
@@ -245,8 +245,11 @@ All Rights Reserved
                     <enumeration value="CANT_UNSET_CORP_CURRENCY"/>
                     <enumeration value="CHILD_SHARE_FAILS_PARENT"/>
                     <enumeration value="CIRCULAR_DEPENDENCY"/>
+                    <enumeration value="CLEAN_SERVICE_ERROR"/>
                     <enumeration value="COLLISION_DETECTED"/>
                     <enumeration value="COMMUNITY_NOT_ACCESSIBLE"/>
+                    <enumeration value="CONFLICTING_ENVIRONMENT_HUB_MEMBER"/>
+                    <enumeration value="CONFLICTING_SSO_USER_MAPPING"/>
                     <enumeration value="CUSTOM_APEX_ERROR"/>
                     <enumeration value="CUSTOM_CLOB_FIELD_LIMIT_EXCEEDED"/>
                     <enumeration value="CUSTOM_ENTITY_OR_FIELD_LIMIT"/>
@@ -254,6 +257,7 @@ All Rights Reserved
                     <enumeration value="CUSTOM_INDEX_EXISTS"/>
                     <enumeration value="CUSTOM_LINK_LIMIT_EXCEEDED"/>
                     <enumeration value="CUSTOM_METADATA_LIMIT_EXCEEDED"/>
+                    <enumeration value="CUSTOM_SETTINGS_LIMIT_EXCEEDED"/>
                     <enumeration value="CUSTOM_TAB_LIMIT_EXCEEDED"/>
                     <enumeration value="DELETE_FAILED"/>
                     <enumeration value="DELETE_OPERATION_TOO_LARGE"/>
@@ -276,6 +280,8 @@ All Rights Reserved
                     <enumeration value="ENTITY_IS_ARCHIVED"/>
                     <enumeration value="ENTITY_IS_DELETED"/>
                     <enumeration value="ENTITY_IS_LOCKED"/>
+                    <enumeration value="ENTITY_SAVE_ERROR"/>
+                    <enumeration value="ENTITY_SAVE_VALIDATION_ERROR"/>
                     <enumeration value="ENVIRONMENT_HUB_MEMBERSHIP_CONFLICT"/>
                     <enumeration value="ENVIRONMENT_HUB_MEMBERSHIP_ERROR_JOINING_HUB"/>
                     <enumeration value="ENVIRONMENT_HUB_MEMBERSHIP_USER_ALREADY_IN_HUB"/>
@@ -312,7 +318,8 @@ All Rights Reserved
                     <enumeration value="INVALID_EMPTY_KEY_OWNER"/>
                     <enumeration value="INVALID_ENTITY_FOR_MATCH_ENGINE_ERROR"/>
                     <enumeration value="INVALID_ENTITY_FOR_MATCH_OPERATION_ERROR"/>
-                    <enumeration value="INVALID_EVENT_SUBSCRIPTION"/>
+                    <enumeration value="INVALID_ENVIRONMENT_HUB_MEMBER"/>
+                    <enumeration value="INVALID_EVENT_PUBLICATION"/>
                     <enumeration value="INVALID_FIELD"/>
                     <enumeration value="INVALID_FIELD_FOR_INSERT_UPDATE"/>
                     <enumeration value="INVALID_FIELD_WHEN_USING_TEMPLATE"/>
@@ -369,6 +376,7 @@ All Rights Reserved
                     <enumeration value="MATCH_OPERATION_UNKNOWN_RULE_ERROR"/>
                     <enumeration value="MATCH_OPERATION_UNSUPPORTED_VERSION_ERROR"/>
                     <enumeration value="MATCH_RUNTIME_ERROR"/>
+                    <enumeration value="MATCH_SERVICE_ERROR"/>
                     <enumeration value="MATCH_SERVICE_UNAVAILABLE_ERROR"/>
                     <enumeration value="MAXIMUM_CCEMAILS_EXCEEDED"/>
                     <enumeration value="MAXIMUM_DASHBOARD_COMPONENTS_EXCEEDED"/>
@@ -386,6 +394,7 @@ All Rights Reserved
                     <enumeration value="MAX_TM_RULE_ITEMS_EXCEEDED"/>
                     <enumeration value="MERGE_FAILED"/>
                     <enumeration value="MISSING_ARGUMENT"/>
+                    <enumeration value="MISSING_RECORD"/>
                     <enumeration value="MIXED_DML_OPERATION"/>
                     <enumeration value="NONUNIQUE_SHIPPING_ADDRESS"/>
                     <enumeration value="NO_APPLICABLE_PROCESS"/>
@@ -400,6 +409,13 @@ All Rights Reserved
                     <enumeration value="PACKAGE_LICENSE_REQUIRED"/>
                     <enumeration value="PACKAGING_API_INSTALL_FAILED"/>
                     <enumeration value="PACKAGING_API_UNINSTALL_FAILED"/>
+                    <enumeration value="PA_API_EXCEPTION"/>
+                    <enumeration value="PA_AXIS_FAULT"/>
+                    <enumeration value="PA_INVALID_ID_EXCEPTION"/>
+                    <enumeration value="PA_NO_ACCESS_EXCEPTION"/>
+                    <enumeration value="PA_NO_DATA_FOUND_EXCEPTION"/>
+                    <enumeration value="PA_URI_SYNTAX_EXCEPTION"/>
+                    <enumeration value="PA_VISIBLE_ACTIONS_FILTER_ORDERING_EXCEPTION"/>
                     <enumeration value="PORTAL_NO_ACCESS"/>
                     <enumeration value="PORTAL_USER_ALREADY_EXISTS_FOR_CONTACT"/>
                     <enumeration value="PRIVATE_CONTACT_ON_ASSET"/>
@@ -742,6 +758,8 @@ All Rights Reserved
                     <element name="childSObject"     type="xsd:string"/>
                     <element name="deprecatedAndHidden" type="xsd:boolean"/>
                     <element name="field"            type="xsd:string"/>
+                    <element name="junctionIdListName"  type="xsd:string" minOccurs="0"/>
+                    <element name="junctionReferenceTo" type="xsd:string" nillable="true" minOccurs="0" maxOccurs="unbounded"/>
                     <element name="relationshipName" type="xsd:string" minOccurs="0"/>
                     <element name="restrictedDelete" type="xsd:boolean" minOccurs="0"/>
                 </sequence>
@@ -843,6 +861,7 @@ All Rights Reserved
                     <element name="filteredLookupInfo"			   type="tns:FilteredLookupInfo" nillable="true" minOccurs="0" />
 
                     <element name="groupable"                  type="xsd:boolean"/>
+                    <element name="highScaleNumber"			   type="xsd:boolean" minOccurs="0" />
                     <element name="htmlFormatted"              type="xsd:boolean" minOccurs="0"/>
                     <element name="idLookup"                   type="xsd:boolean"/>
                     <element name="inlineHelpText"             type="xsd:string" minOccurs="0"/>
@@ -946,6 +965,8 @@ All Rights Reserved
                     <element name="name"            type="xsd:string"/>
                     <element name="quickActionList"             type="tns:DescribeQuickActionListResult" minOccurs="0" />
                     <element name="regions"			type="tns:DescribeFlexiPageRegion" minOccurs="0" maxOccurs="unbounded"/>
+                    <element name="sobjectType"     type="xsd:string" nillable="true"/>
+                    <element name="template"     type="xsd:string" nillable="true"/>
                     <element name="type"            type="xsd:string"/>
                 </sequence>
             </complexType>
@@ -1711,6 +1732,7 @@ All Rights Reserved
                     <element name="logoUrl"         type="xsd:string" />
                     <element name="namespace"       type="xsd:string" minOccurs="0"/>
                     <element name="selected"        type="xsd:boolean" />
+                    <element name="tabSetId" type="xsd:string" />
                     <element name="tabs"            type="tns:DescribeTab" minOccurs="0" maxOccurs="unbounded"/>
                 </sequence>
             </complexType>
@@ -1908,6 +1930,7 @@ All Rights Reserved
 
 
 
+
             <element name="describeFlexiPages">
                 <complexType>
                     <sequence>
@@ -2058,6 +2081,34 @@ All Rights Reserved
                 <complexType>
                     <sequence>
                         <element name="result" type="tns:ExecuteListViewResult" minOccurs="0" maxOccurs="1"/>
+                    </sequence>
+                </complexType>
+            </element>
+
+
+            <simpleType name="listViewIsSoqlCompatible">
+                <restriction base="xsd:string">
+                    <enumeration value="TRUE"/>
+                    <enumeration value="FALSE"/>
+                    <enumeration value="ALL"/>
+                </restriction>
+            </simpleType>
+
+            <element name="describeSObjectListViews">
+                <complexType>
+                    <sequence>
+                        <element name="sObjectType" type="xsd:string"/>
+                        <element name="recentsOnly" type="xsd:boolean"/>
+                        <element name="isSoqlCompatible" type="tns:listViewIsSoqlCompatible"/>
+                        <element name="limit" type="xsd:int"/>
+                        <element name="offset" type="xsd:int"/>
+                    </sequence>
+                </complexType>
+            </element>
+            <element name="describeSObjectListViewsResponse">
+                <complexType>
+                    <sequence>
+                        <element name="result" type="tns:DescribeSoqlListViewResult"/>
                     </sequence>
                 </complexType>
             </element>
@@ -2717,6 +2768,7 @@ All Rights Reserved
 
 
 
+
             <!-- ideally this could of just been elem name="..." type="xsd:boolean"
                  but is required to be nested within a complexType for .NET 1.1 compatibility -->
     <element name="MruHeader">
@@ -2761,7 +2813,7 @@ All Rights Reserved
                     <sequence>
                         <element name="language"  type="xsd:string" minOccurs="0"/>
 
-                    	<element name="localizeErrors" type="xsd:boolean"/>
+                    	<element name="localizeErrors" type="xsd:boolean" minOccurs="0"/>
 
                     </sequence>
                 </complexType>
@@ -2788,6 +2840,7 @@ All Rights Reserved
                     <enumeration value="ARGUMENT_OBJECT_PARSE_ERROR"/>
                     <enumeration value="ASYNC_OPERATION_LOCATOR"/>
                     <enumeration value="BATCH_PROCESSING_HALTED"/>
+                    <enumeration value="CANNOT_DELETE_ENTITY"/>
                     <enumeration value="CANNOT_DELETE_OWNER"/>
                     <enumeration value="CANT_ADD_STANDADRD_PORTAL_USER_TO_TERRITORY"/>
                     <enumeration value="CANT_ADD_STANDARD_PORTAL_USER_TO_TERRITORY"/>
@@ -2804,6 +2857,7 @@ All Rights Reserved
                     <enumeration value="CONTENT_HUB_TIMEOUT_EXCEPTION"/>
                     <enumeration value="CONTENT_HUB_UNEXPECTED_EXCEPTION"/>
                     <enumeration value="CUSTOM_METADATA_LIMIT_EXCEEDED"/>
+                    <enumeration value="CUSTOM_SETTINGS_LIMIT_EXCEEDED"/>
                     <enumeration value="DATACLOUD_API_CLIENT_EXCEPTION"/>
                     <enumeration value="DATACLOUD_API_DISABLED_EXCEPTION"/>
                     <enumeration value="DATACLOUD_API_SERVER_BUSY_EXCEPTION"/>
@@ -2884,6 +2938,7 @@ All Rights Reserved
                     <enumeration value="MISSING_ARGUMENT"/>
                     <enumeration value="MISSING_RECORD"/>
                     <enumeration value="MUTUAL_AUTHENTICATION_FAILED"/>
+                    <enumeration value="NOT_ACCEPTABLE"/>
                     <enumeration value="NOT_MODIFIED"/>
                     <enumeration value="NO_SOFTPHONE_LAYOUT"/>
                     <enumeration value="NUMBER_OUTSIDE_VALID_RANGE"/>
@@ -2906,6 +2961,7 @@ All Rights Reserved
                     <enumeration value="SOCIALCRM_FEEDSERVICE_API_SERVER_EXCEPTION"/>
                     <enumeration value="SOCIALCRM_FEEDSERVICE_API_UNAVAILABLE"/>
                     <enumeration value="SSO_SERVICE_DOWN"/>
+                    <enumeration value="SST_ADMIN_FILE_DOWNLOAD_EXCEPTION"/>
                     <enumeration value="TOO_MANY_APEX_REQUESTS"/>
                     <enumeration value="TOO_MANY_RECIPIENTS"/>
                     <enumeration value="TOO_MANY_RECORDS"/>
@@ -2929,6 +2985,7 @@ All Rights Reserved
                     <enumeration value="fns:ARGUMENT_OBJECT_PARSE_ERROR"/>
                     <enumeration value="fns:ASYNC_OPERATION_LOCATOR"/>
                     <enumeration value="fns:BATCH_PROCESSING_HALTED"/>
+                    <enumeration value="fns:CANNOT_DELETE_ENTITY"/>
                     <enumeration value="fns:CANNOT_DELETE_OWNER"/>
                     <enumeration value="fns:CANT_ADD_STANDADRD_PORTAL_USER_TO_TERRITORY"/>
                     <enumeration value="fns:CANT_ADD_STANDARD_PORTAL_USER_TO_TERRITORY"/>
@@ -2945,6 +3002,7 @@ All Rights Reserved
                     <enumeration value="fns:CONTENT_HUB_TIMEOUT_EXCEPTION"/>
                     <enumeration value="fns:CONTENT_HUB_UNEXPECTED_EXCEPTION"/>
                     <enumeration value="fns:CUSTOM_METADATA_LIMIT_EXCEEDED"/>
+                    <enumeration value="fns:CUSTOM_SETTINGS_LIMIT_EXCEEDED"/>
                     <enumeration value="fns:DATACLOUD_API_CLIENT_EXCEPTION"/>
                     <enumeration value="fns:DATACLOUD_API_DISABLED_EXCEPTION"/>
                     <enumeration value="fns:DATACLOUD_API_SERVER_BUSY_EXCEPTION"/>
@@ -3025,6 +3083,7 @@ All Rights Reserved
                     <enumeration value="fns:MISSING_ARGUMENT"/>
                     <enumeration value="fns:MISSING_RECORD"/>
                     <enumeration value="fns:MUTUAL_AUTHENTICATION_FAILED"/>
+                    <enumeration value="fns:NOT_ACCEPTABLE"/>
                     <enumeration value="fns:NOT_MODIFIED"/>
                     <enumeration value="fns:NO_SOFTPHONE_LAYOUT"/>
                     <enumeration value="fns:NUMBER_OUTSIDE_VALID_RANGE"/>
@@ -3047,6 +3106,7 @@ All Rights Reserved
                     <enumeration value="fns:SOCIALCRM_FEEDSERVICE_API_SERVER_EXCEPTION"/>
                     <enumeration value="fns:SOCIALCRM_FEEDSERVICE_API_UNAVAILABLE"/>
                     <enumeration value="fns:SSO_SERVICE_DOWN"/>
+                    <enumeration value="fns:SST_ADMIN_FILE_DOWNLOAD_EXCEPTION"/>
                     <enumeration value="fns:TOO_MANY_APEX_REQUESTS"/>
                     <enumeration value="fns:TOO_MANY_RECIPIENTS"/>
                     <enumeration value="fns:TOO_MANY_RECORDS"/>
@@ -3356,6 +3416,13 @@ All Rights Reserved
     </message>
     <message name="executeListViewResponse">
         <part element="tns:executeListViewResponse" name="parameters"/>
+    </message>
+
+    <message name="describeSObjectListViewsRequest">
+        <part element="tns:describeSObjectListViews" name="parameters"/>
+    </message>
+    <message name="describeSObjectListViewsResponse">
+        <part element="tns:describeSObjectListViewsResponse" name="parameters"/>
     </message>
 
     <message name="describeTabsRequest">
@@ -3717,6 +3784,14 @@ All Rights Reserved
             <documentation>Execute the specified list view and return the presentation-ready results.</documentation>
             <input  message="tns:executeListViewRequest"/>
             <output message="tns:executeListViewResponse"/>
+        </operation>
+
+        <operation name="describeSObjectListViews">
+            <documentation>Describe the ListViews of a SObject as SOQL metadata for the generation of SOQL.</documentation>
+            <input  message="tns:describeSObjectListViewsRequest"/>
+            <output message="tns:describeSObjectListViewsResponse"/>
+            <fault  message="tns:InvalidSObjectFault" name="InvalidSObjectFault"/>
+            <fault  message="tns:UnexpectedErrorFault" name="UnexpectedErrorFault"/>
         </operation>
 
         <operation name="describeTabs">
@@ -4301,6 +4376,25 @@ All Rights Reserved
                 <soap:header use="literal" message="tns:Header" part="LimitInfoHeader"/>
                 <soap:body use="literal"/>
             </output>
+        </operation>
+        <operation name="describeSObjectListViews">
+            <soap:operation soapAction=""/>
+            <input>
+                <soap:header use="literal" message="tns:Header" part="SessionHeader"/>
+                <soap:header use="literal" message="tns:Header" part="CallOptions"/>
+                <soap:header use="literal" message="tns:Header" part="PackageVersionHeader"/>
+                <soap:body parts="parameters" use="literal"/>
+            </input>
+            <output>
+                <soap:header use="literal" message="tns:Header" part="LimitInfoHeader"/>
+                <soap:body use="literal"/>
+            </output>
+            <fault name="InvalidSObjectFault">
+                <soap:fault name="InvalidSObjectFault" use="literal"/>
+            </fault>
+            <fault name="UnexpectedErrorFault">
+                <soap:fault name="UnexpectedErrorFault" use="literal"/>
+            </fault>
         </operation>
         <operation name="describeTabs">
             <soap:operation soapAction=""/>
@@ -4980,7 +5074,7 @@ All Rights Reserved
     <service name="SforceService">
         <documentation>Sforce SOAP API</documentation>
         <port binding="tns:SoapBinding" name="Soap">
-            <soap:address location="https://login.salesforce.com/services/Soap/u/32.0"/>
+            <soap:address location="https://login.salesforce.com/services/Soap/u/33.0"/>
         </port>
     </service>
 </definitions>
