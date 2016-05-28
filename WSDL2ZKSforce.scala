@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 Simon Fell
+// Copyright (c) 2013-2014,2016 Simon Fell
 //
 // Permission is hereby granted, free of charge, to any person obtaining a 
 // copy of this software and associated documentation files (the "Software"), 
@@ -565,14 +565,14 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 	}
 	
 	def writeMethodDecl(w: SourceWriter) {
-		w.println(s"""// $description
+		w.println(s"""/** $description */
 					|$objcSignature;
 					|""".stripMargin('|'))
 	}
 	
 	def writeMethodImpl(w: SourceWriter) {
 		val nullValue = if (returnType.objcName == "void") "" else "nil"
-		w.println(s"""// $description
+		w.println(s"""/** $description */
 					|$objcSignature {
 					|	if (!authSource) return $nullValue;
 					|	[self checkSession];
@@ -621,11 +621,11 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 	def blockMethodSignature():String = {
 		val cp = name.length + 15
 		if (params.length == 0)
-			s"""// ${description}
+			s"""/** ${description} */
 				|-(void) perform${name.capitalize}WithFailBlock:(zkFailWithExceptionBlock)failBlock
 				|${" ".padTo(cp-13,' ')}completeBlock:(${returnType.blockTypeName})completeBlock""".stripMargin('|')
 		else
-			s"""// ${description}
+			s"""/** ${description} */
 				|-(void) perform${name.capitalize}${paramList}
 				|${" ".padTo(cp-9,' ')}failBlock:(zkFailWithExceptionBlock)failBlock
 				|${" ".padTo(cp-13,' ')}completeBlock:(${returnType.blockTypeName})completeBlock""".stripMargin('|')
