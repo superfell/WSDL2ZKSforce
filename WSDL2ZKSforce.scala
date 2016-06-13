@@ -1067,6 +1067,8 @@ def stripPrefix(v: String): String = {
 
 object WSDL2ZKSforce {
 	def main(args: Array[String]) {
+		// class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val isPointer: Boolean)
+		// accessor is the accessor method on the ZKXmlDeserializer class
 		val types = Map(
 					"string" 		-> new TypeInfo("string", 		"NSString",  	"string",  		true),
 					"int" 	 		-> new TypeInfo("int",    		"NSInteger", 	"integer", 		false),
@@ -1077,7 +1079,9 @@ object WSDL2ZKSforce {
 					"QueryResult"   -> new TypeInfo("QueryResult",  "ZKQueryResult","queryResult",	true),
 					"dateTime"		-> new TypeInfo("dateTime",		"NSDate",  	 	"dateTime", 	true),
 					"date"   		-> new TypeInfo("date",    		"NSDate",    	"date",     	true),
-					"base64Binary" 	-> new TypeInfo("base64Binary", "NSData", 	 	"blob",     	true)
+					"time"   		-> new TypeInfo("time",    		"NSDate",    	"time",     	true),
+					"base64Binary" 	-> new TypeInfo("base64Binary", "NSData", 	 	"blob",     	true),
+					"anyType"		-> new TypeInfo("anyType",		"ZKXsdAnyType",	"anyType",		true)
 					)
 					
 		val wsdl = XML.loadFile("./partner.wsdl")
