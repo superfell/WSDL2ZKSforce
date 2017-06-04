@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014,2016 Simon Fell
+// Copyright (c) 2013-2017 Simon Fell
 //
 // Permission is hereby granted, free of charge, to any person obtaining a 
 // copy of this software and associated documentation files (the "Software"), 
@@ -439,9 +439,13 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 
 class InputOutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fields: Seq[ComplexTypeProperty], baseType:TypeInfo) extends InputComplexTypeInfo(xmlName, objcName, xmlNode, fields, baseType) {
     
+	override def baseClass(): String = { 
+		if (baseType == null) "ZKXmlDeserializer<ZKXMLSerializable>" else super.baseClass()
+	}
+	
     override protected def writeForwardDecls(w: SourceWriter) {
-        w.printClassForwardDecl("ZKXmlDeserializer");
-        w.printClassForwardDecl("zkElement");
+		w.printImport("ZKXmlDeserializer.h")
+		w.printImport("zkParser.h")
 	}
 	
     override protected def writeHeaderProperties(w: SourceWriter) {
@@ -452,12 +456,6 @@ class InputOutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Nod
         super.writeHeaderProperties(w);
     }
     
-    override protected def writeImplImports(w: SourceWriter) {
-		super.writeImplImports(w)
-		w.printImport("ZKXmlDeserializer.h")
-		w.printImport("zkParser.h")
-	}
-	
     override protected def writeDeallocImpl(w: SourceWriter) {
         w.println()
         w.println("-(id)init {")
