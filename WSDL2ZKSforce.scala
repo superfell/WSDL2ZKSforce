@@ -58,7 +58,12 @@ class SourceWriter(val file: File) {
 	}
 	
 	def printImport(f: String) {
-		w.println(s"""#import "$f"""")
+		val n = f match {
+			case "ZKSObject.h" => "zkSObject.h"
+			case "ZKQueryResult.h" => "zkQueryResult.h"
+			case _ => f
+		}
+		w.println(s"""#import "$n"""")
 	}
 	
 	def printClassForwardDecl(c: String) {
@@ -444,7 +449,7 @@ class InputOutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Nod
 	}
 	
     override protected def writeForwardDecls(w: SourceWriter) {
-		w.printImport("ZKXmlDeserializer.h")
+		w.printImport("zkXmlDeserializer.h")
 		w.printImport("zkParser.h")
 	}
 	
@@ -706,7 +711,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 	override def writeHeader() {
 		val w = new SourceWriter(new File(new File("output"), "ZKSforceClient+zkAsyncQuery.h"))
 		w.printLicenseComment()
-		w.printImport("zkSforceClient+Operations.h")
+		w.printImport("ZKSforceClient+Operations.h")
 		w.println()
 		w.println("@interface ZKSforceClient (zkAsyncQuery)")
 		w.println()
