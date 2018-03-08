@@ -1075,6 +1075,7 @@ object WSDL2ZKSforce {
 		val types = Map(
 					"string" 		-> new TypeInfo("string", 		"NSString",  	"string",  		true),
 					"int" 	 		-> new TypeInfo("int",    		"NSInteger", 	"integer", 		false),
+					"long"			-> new TypeInfo("long",			"int64_t",		"int64",		false),
 					"double"		-> new TypeInfo("double",		"double",		"double",		false),
 					"boolean"		-> new TypeInfo("boolean", 		"BOOL", 	 	"boolean", 		false),
 					"ID"	 		-> new TypeInfo("ID",			"NSString",  	"string",  		true),
