@@ -947,7 +947,8 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		for (i <- fixedImports)
 			w.printImport(i)
 		w.printImports(complexTypes.values)
-		for(f <- new File("../zkSforce/zkSforce").listFiles().filter(_.getName().contains("+")).filter(_.getName().endsWith(".h")))
+		val extraImports = List.fromArray(new File("../zkSforce/zkSforce").listFiles().filter(_.getName().contains("+")).filter(_.getName().endsWith(".h")))
+		for(f <- extraImports.sortWith(_.getName().toLowerCase() < _.getName().toLowerCase()))
 			w.printImport(f.getName())
 		w.close()
 	}
