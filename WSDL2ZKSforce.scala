@@ -579,7 +579,7 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 					|$objcSignature {
 					|	if (!authSource) return $nullValue;
 					|	[self checkSession];
-					|	ZKEnvelope *env = [[[ZKPartnerEnvelope alloc] initWithSessionHeader:[authSource sessionId]] autorelease];""".stripMargin('|'))
+					|	ZKEnvelope *env = [[[ZKPartnerEnvelope alloc] initWithSessionHeader:authSource.sessionId] autorelease];""".stripMargin('|'))
 		for (h <- inputHeaders.filter(_ != "SessionHeader"))
 			w.println(s"	[self add${h}:env];")
 		w.println(s"""|	[env moveToBody];
@@ -588,11 +588,11 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 		val retStmt = returnType.accessor("deser", "result")
 		w.println(s"""	[env endElement:@"${name}"];""")
 		if (returnType.objcName == "void") {
-			w.println("""	[self sendRequest:[env end] name:NSStringFromSelector(_cmd)];
+			w.println("""	[self sendRequest:env.end name:NSStringFromSelector(_cmd)];
 						|}
 						|""".stripMargin('|'))
 		} else {
-			w.println(s"""	zkElement *rn = [self sendRequest:[env end] name:NSStringFromSelector(_cmd)];
+			w.println(s"""	zkElement *rn = [self sendRequest:env.end name:NSStringFromSelector(_cmd)];
 					 |	ZKXmlDeserializer *deser = [[[ZKXmlDeserializer alloc] initWithXmlElement:rn] autorelease];
 					 |	return $retStmt;
 					 |}
@@ -744,7 +744,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 		w.println(s"""@implementation ZKSforceClient (zkAsyncQuery)
 				|
 				|-(BOOL)confirmLoggedIn {
-				|	if (![self loggedIn]) {
+				|	if (!self.loggedIn) {
 				|		NSLog(@"ZKSforceClient does not have a valid session. request not executed");
 				|		return NO;
 				|	}
