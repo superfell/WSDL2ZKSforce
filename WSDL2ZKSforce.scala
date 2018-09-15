@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2017 Simon Fell
+// Copyright (c) 2013-2018 Simon Fell
 //
 // Permission is hereby granted, free of charge, to any person obtaining a 
 // copy of this software and associated documentation files (the "Software"), 
@@ -271,7 +271,7 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fiel
 	}
 	
 	override def accessor(instanceName:String, elemName: String): String = {
-		s"""[[$instanceName complexTypeArrayFromElements:@"$elemName" cls:[${objcName} class]] lastObject]"""
+		s"""[$instanceName complexTypeArrayFromElements:@"$elemName" cls:[${objcName} class]].lastObject"""
 	}
 	
 	protected def headerImportFile(): String = { if (baseType == null) "" else baseType.objcName + ".h" }
@@ -433,7 +433,7 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 				|}
 				|
 				|-(NSUInteger)hash {
-				|	return [node hash];
+				|	return node.hash;
 				|}
 				|""".stripMargin('|'))
 		}
@@ -454,21 +454,21 @@ class InputOutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Nod
 	}
 	
     override protected def writeHeaderProperties(w: SourceWriter) {
-        w.println("-(id)init;")
-        w.println("-(id)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d;");
-        w.println("-(id)initWithXmlElement:(zkElement *)e;")
+        w.println("-(instancetype)init NS_DESIGNATED_INITIALIZER;")
+        w.println("-(instancetype)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d NS_DESIGNATED_INITIALIZER;");
+        w.println("-(instancetype)initWithXmlElement:(zkElement *)e;")
         w.println();
         super.writeHeaderProperties(w);
     }
     
     override protected def writeDeallocImpl(w: SourceWriter) {
         w.println()
-        w.println("-(id)init {")
+        w.println("-(instancetype)init {")
         w.println("    self = [super init];")
         w.println("    return self;")
         w.println("}")
         w.println()
-        w.println("-(id)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d {")
+        w.println("-(instancetype)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d {")
         if (baseType == null)
             w.println("    self = [super init];")
         else
@@ -478,7 +478,7 @@ class InputOutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Nod
         w.println("    return self;")
         w.println("}")
         w.println()
-        w.println("-(id)initWithXmlElement:(zkElement *)e {")
+        w.println("-(instancetype)initWithXmlElement:(zkElement *)e {")
         w.println("    ZKXmlDeserializer *d = [[[ZKXmlDeserializer alloc] initWithXmlElement:e] autorelease];")
         w.println("    return [self initWithZKXmlDeserializer:d];")
         w.println("}")
@@ -541,7 +541,7 @@ class ZKDescribeSObject(xmlName:String, objcName:String, xmlNode:Node, fields:Se
 					|	if (fieldList == nil) {
  					|		NSArray *fa = [self complexTypeArrayFromElements:@"fields" cls:[ZKDescribeField class]];
 					|		for (ZKDescribeField *f in fa)
-					|			[f setSobject:self];
+					|			f.sobject = self;
 					|		fieldList = [fa retain];
 					|	}
 					|	return fieldList;
