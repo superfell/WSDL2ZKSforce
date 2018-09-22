@@ -321,9 +321,6 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fiel
 	}
 	
 	protected def writeHeaderIVars(w: SourceWriter) {
-		if (includeIVarDecl)
-			for (f <- fields)
-				w.println(f.ivarDecl(padMembersTo(false)))
 	}
 
 	protected def writeHeaderProperties(w: SourceWriter) {
