@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2017 Simon Fell
+// Copyright (c) 2013-2018 Simon Fell
 //
 // Permission is hereby granted, free of charge, to any person obtaining a 
 // copy of this software and associated documentation files (the "Software"), 
@@ -120,8 +120,17 @@ class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val 
 	def propertyDeclComment(): String =  { "" }
 	
 	// what property flags should be used for this type.
-	def propertyFlags(): String = { if (isPointer) "retain" else "assign" }
+	def propertyFlags(): String = { if (isPointer) "strong" else "assign" }
 	
+    // what property flags should be used for a readonly property of this type
+    def readonlyPropertyFlags(): String = { if (isPointer) "weak, readonly" else "readonly" }
+    
+    def propertyLengthForPaddingCalc(includeFlags: Boolean) : Int = {
+        var l = fullTypeName.length
+        if (includeFlags) l += readonlyPropertyFlags.length
+        return l
+    }
+    
 	// full name of the objective-c type, includes * for pointer types.
 	def fullTypeName(): String = { if (isPointer) objcName + " *" else objcName }
 	
@@ -189,9 +198,10 @@ class ComplexTypeProperty(name: String, val propType: TypeInfo, val nillable: Bo
 	}
 	
 	def propertyDecl(padTypeTo: Int, readOnly: Boolean): String = {
-		val f = if (readOnly) "readonly" else propType.propertyFlags
+		val f = if (readOnly) propType.readonlyPropertyFlags else propType.propertyFlags
 		val comment = propType.propertyDeclComment
-		val td = typeDef(padTypeTo)
+        val padTo = if (readOnly) padTypeTo - f.length else padTypeTo
+		val td = typeDef(padTo)
 		val nr = if (propertyName.startsWith("new")) " NS_RETURNS_NOT_RETAINED" else ""
 		var nrc = if (nr.length > 0) "; returns an autoreleased object, doesn't follow cocoa rules for properties/method starting with 'new'" else ""
 		s"@property ($f) $td$nr; $comment$nrc"
@@ -271,7 +281,7 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fiel
 	}
 	
 	override def accessor(instanceName:String, elemName: String): String = {
-		s"""[[$instanceName complexTypeArrayFromElements:@"$elemName" cls:[${objcName} class]] lastObject]"""
+		s"""[$instanceName complexTypeArrayFromElements:@"$elemName" cls:[${objcName} class]].lastObject"""
 	}
 	
 	protected def headerImportFile(): String = { if (baseType == null) "" else baseType.objcName + ".h" }
@@ -306,18 +316,15 @@ class ComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, val fiel
 			w.printClassForwardDecl(f.propType.objcName)
 	}
 	
-	private def padMembersTo(): Int = {
- 		if (fields.length == 0) 0 else fields.map(_.propType.fullTypeName.length).max + 1
+	private def padMembersTo(includeFlags: Boolean): Int = {
+ 		if (fields.length == 0) 0 else fields.map(_.propType.propertyLengthForPaddingCalc(includeFlags)).max + 1
 	}
 	
 	protected def writeHeaderIVars(w: SourceWriter) {
-		if (includeIVarDecl)
-			for (f <- fields)
-				w.println(f.ivarDecl(padMembersTo))
 	}
 
 	protected def writeHeaderProperties(w: SourceWriter) {
-		val padTo = padMembersTo
+		val padTo = padMembersTo(fieldsAreReadOnly)
 		for (f <- fields)
 			w.println(f.propertyDecl(padTo, fieldsAreReadOnly))
 	}
@@ -369,19 +376,13 @@ class InputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fie
 		w.printImport("zkEnvelope.h")
 	}
 
-    protected def writeDeallocImpl(w: SourceWriter) {
-		w.println()
-		w.println("-(void)dealloc {")
-		for (f <- fields.filter(_.propType.isPointer))
-			w.println(s"\t[${f.propertyName} release];")
-		w.println("\t[super dealloc];")
-		w.println("}")
+    protected def writeExtraImpl(w: SourceWriter) {
     }
     
 	override protected def writeImplFileBody(w: SourceWriter) {
 		w.println("@synthesize " + fields.map(_.propertyName).mkString(", ") + ";")
-		writeDeallocImpl(w);
-		w.println()
+        writeExtraImpl(w)
+        w.println()
 		w.println("-(void)serializeToEnvelope:(ZKEnvelope *)env elemName:(NSString *)elemName {")
 		// if there's a baseType, then this is an extension type, and we need to serialize our type out as an xsi:type attribute
 		if (baseType == null)
@@ -417,7 +418,7 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 	override protected def writeImplFileBody(w: SourceWriter) {
 		if (implementNSCopying) {
 			w.println(s"""-(id)copyWithZone:(NSZone *)zone {
-				|    zkElement *e = [[node copyWithZone:zone] autorelease];
+				|    zkElement *e = [node copyWithZone:zone];
 				|    $objcName *c = [[$objcName alloc] initWithXmlElement:e];
 				|    ${additionalNSCopyImpl}
 				|    return c;
@@ -433,7 +434,7 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 				|}
 				|
 				|-(NSUInteger)hash {
-				|	return [node hash];
+				|	return node.hash;
 				|}
 				|""".stripMargin('|'))
 		}
@@ -454,21 +455,21 @@ class InputOutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Nod
 	}
 	
     override protected def writeHeaderProperties(w: SourceWriter) {
-        w.println("-(id)init;")
-        w.println("-(id)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d;");
-        w.println("-(id)initWithXmlElement:(zkElement *)e;")
+        w.println("-(instancetype)init NS_DESIGNATED_INITIALIZER;")
+        w.println("-(instancetype)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d NS_DESIGNATED_INITIALIZER;");
+        w.println("-(instancetype)initWithXmlElement:(zkElement *)e;")
         w.println();
         super.writeHeaderProperties(w);
     }
     
-    override protected def writeDeallocImpl(w: SourceWriter) {
+    override protected def writeExtraImpl(w: SourceWriter) {
         w.println()
-        w.println("-(id)init {")
+        w.println("-(instancetype)init {")
         w.println("    self = [super init];")
         w.println("    return self;")
         w.println("}")
         w.println()
-        w.println("-(id)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d {")
+        w.println("-(instancetype)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d {")
         if (baseType == null)
             w.println("    self = [super init];")
         else
@@ -478,11 +479,10 @@ class InputOutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Nod
         w.println("    return self;")
         w.println("}")
         w.println()
-        w.println("-(id)initWithXmlElement:(zkElement *)e {")
-        w.println("    ZKXmlDeserializer *d = [[[ZKXmlDeserializer alloc] initWithXmlElement:e] autorelease];")
+        w.println("-(instancetype)initWithXmlElement:(zkElement *)e {")
+        w.println("    ZKXmlDeserializer *d = [[ZKXmlDeserializer alloc] initWithXmlElement:e];")
         w.println("    return [self initWithZKXmlDeserializer:d];")
         w.println("}")
-        super.writeDeallocImpl(w)
     }
 }
 
@@ -496,11 +496,11 @@ class ZKDescribeField(xmlName:String, objcName:String, xmlNode:Node, fields:Seq[
 	}
 	
 	override protected def writeHeaderIVars(w: SourceWriter) {
-		w.println("\tZKDescribeSObject *sobject;")
+		w.println("\tZKDescribeSObject *__weak sobject;")
 	}
 	
 	override protected def writeHeaderProperties(w: SourceWriter) {
-		w.println("@property (assign) ZKDescribeSObject *sobject; // assign to stop a ref counting loop")
+		w.println("@property (weak) ZKDescribeSObject *sobject;")
 		w.println()
 		super.writeHeaderProperties(w)
 	}
@@ -531,18 +531,12 @@ class ZKDescribeSObject(xmlName:String, objcName:String, xmlNode:Node, fields:Se
 	}
 
 	override protected def writeImplFileBody(w: SourceWriter) {
-		w.println("""-(void)dealloc {
-					|	[fieldList release];
-					|	[fieldsByName release];
-					|	[super dealloc];
-					|}
-					|
-					|-(NSArray *)fields {
+		w.println("""-(NSArray *)fields {
 					|	if (fieldList == nil) {
  					|		NSArray *fa = [self complexTypeArrayFromElements:@"fields" cls:[ZKDescribeField class]];
 					|		for (ZKDescribeField *f in fa)
-					|			[f setSobject:self];
-					|		fieldList = [fa retain];
+					|			f.sobject = self;
+					|		fieldList = fa;
 					|	}
 					|	return fieldList;
 					|}
@@ -579,7 +573,7 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 					|$objcSignature {
 					|	if (!authSource) return $nullValue;
 					|	[self checkSession];
-					|	ZKEnvelope *env = [[[ZKPartnerEnvelope alloc] initWithSessionHeader:[authSource sessionId]] autorelease];""".stripMargin('|'))
+					|	ZKEnvelope *env = [[ZKPartnerEnvelope alloc] initWithSessionHeader:authSource.sessionId];""".stripMargin('|'))
 		for (h <- inputHeaders.filter(_ != "SessionHeader"))
 			w.println(s"	[self add${h}:env];")
 		w.println(s"""|	[env moveToBody];
@@ -588,12 +582,12 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 		val retStmt = returnType.accessor("deser", "result")
 		w.println(s"""	[env endElement:@"${name}"];""")
 		if (returnType.objcName == "void") {
-			w.println("""	[self sendRequest:[env end] name:NSStringFromSelector(_cmd)];
+			w.println("""	[self sendRequest:env.end name:NSStringFromSelector(_cmd)];
 						|}
 						|""".stripMargin('|'))
 		} else {
-			w.println(s"""	zkElement *rn = [self sendRequest:[env end] name:NSStringFromSelector(_cmd)];
-					 |	ZKXmlDeserializer *deser = [[[ZKXmlDeserializer alloc] initWithXmlElement:rn] autorelease];
+			w.println(s"""	zkElement *rn = [self sendRequest:env.end name:NSStringFromSelector(_cmd)];
+					 |	ZKXmlDeserializer *deser = [[ZKXmlDeserializer alloc] initWithXmlElement:rn];
 					 |	return $retStmt;
 					 |}
 					 |""".stripMargin('|'))
@@ -744,7 +738,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 		w.println(s"""@implementation ZKSforceClient (zkAsyncQuery)
 				|
 				|-(BOOL)confirmLoggedIn {
-				|	if (![self loggedIn]) {
+				|	if (!self.loggedIn) {
 				|		NSLog(@"ZKSforceClient does not have a valid session. request not executed");
 				|		return NO;
 				|	}
@@ -756,7 +750,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				|// it handles making the relevant call in any desired queue, 
 				|// and then calling the fail or complete block on the UI thread.
 				|//
-				|-(void)performRequest:(id (^)())requestBlock
+				|-(void)performRequest:(id (^)(void))requestBlock
 				|         checkSession:(BOOL)checkSession
 				|            failBlock:(zkFailWithExceptionBlock)failBlock 
 				|        completeBlock:(void (^)(id))completeBlock
@@ -796,7 +790,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				|// Perform an asynchronous API call. 
 				|// Defaults to the default background global queue.
 				|//
-				|-(void)performRequest:(id (^)())requestBlock
+				|-(void)performRequest:(id (^)(void))requestBlock
 				|         checkSession:(BOOL)checkSession
 				|            failBlock:(zkFailWithExceptionBlock)failBlock 
 				|        completeBlock:(void (^)(id))completeBlock {
