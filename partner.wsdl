@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Salesforce.com Partner Web Services API Version 44.0
-Generated on 2018-09-15 21:42:05 +0000.
+Salesforce.com Partner Web Services API Version 45.0
+Generated on 2019-01-12 19:41:22 +0000.
 
-Copyright 1999-2018 salesforce.com, inc.
+Copyright 1999-2019 salesforce.com, inc.
 All Rights Reserved
 -->
 
@@ -654,6 +654,7 @@ All Rights Reserved
                     <enumeration value="PA_NO_DATA_FOUND_EXCEPTION"/>
                     <enumeration value="PA_URI_SYNTAX_EXCEPTION"/>
                     <enumeration value="PA_VISIBLE_ACTIONS_FILTER_ORDERING_EXCEPTION"/>
+                    <enumeration value="PLATFORM_EVENT_PUBLISHING_UNAVAILABLE"/>
                     <enumeration value="PORTAL_NO_ACCESS"/>
                     <enumeration value="PORTAL_USER_ALREADY_EXISTS_FOR_CONTACT"/>
                     <enumeration value="PORTAL_USER_CREATION_RESTRICTED_WITH_ENCRYPTION"/>
@@ -803,6 +804,9 @@ All Rights Reserved
                     </enumeration>
                     <enumeration value="ASSIGNMENTITEM_INVALID_DATATYPE_IN_ELEMENT">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, elementName, dataType, incompatibleDataType</xsd:documentation></xsd:annotation>
+                    </enumeration>
+                    <enumeration value="ASSIGNMENTITEM_INVALID_MERGE_FIELD">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, parameterName, operatorName</xsd:documentation></xsd:annotation>
                     </enumeration>
                     <enumeration value="ASSIGNMENTITEM_INVALID_REFERENCE">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, parameterName, operatorName</xsd:documentation></xsd:annotation>
@@ -981,6 +985,9 @@ All Rights Reserved
                     <enumeration value="EXTERNAL_OBJECT_FIELDS_NOT_SUPPORTED">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, fieldReference</xsd:documentation></xsd:annotation>
                     </enumeration>
+                    <enumeration value="EX_AUTOLAUNCHED_SUBFLOW_INCOMPATIBLE_FLOWTYPE">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, subflowType</xsd:documentation></xsd:annotation>
+                    </enumeration>
                     <enumeration value="FIELDASSIGNMENT_FIELD_INCOMPATIBLE_DATATYPE">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, fieldName, elementName</xsd:documentation></xsd:annotation>
                     </enumeration>
@@ -1037,6 +1044,9 @@ All Rights Reserved
                     </enumeration>
                     <enumeration value="FLEXIPAGE_PICKLIST_INVALID_VALUE_EXCEPTION">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: componentName, propertyName, propertyType, invalidValue</xsd:documentation></xsd:annotation>
+                    </enumeration>
+                    <enumeration value="FLEXIPAGE_TEMPLATE_INVALID_SWITCH">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: newTemplate, oldTemplate</xsd:documentation></xsd:annotation>
                     </enumeration>
                     <enumeration value="FLOW_ELEMENT_SCALE_LESS_THAN_ZERO">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, elementName</xsd:documentation></xsd:annotation>
@@ -1212,14 +1222,26 @@ All Rights Reserved
                     <enumeration value="PROCESSMETADATAVALUE_NONEXISTENT_ELEMENT">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, metadataValue</xsd:documentation></xsd:annotation>
                     </enumeration>
+                    <enumeration value="PROCESSTYPE_COMPONENTTYPE_NOT_SUPPORTED">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, processType, fieldType</xsd:documentation></xsd:annotation>
+                    </enumeration>
+                    <enumeration value="PROCESSTYPE_ELEMENT_CONFIG_NOT_SUPPORTED">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, processType, attributeSet, elementType</xsd:documentation></xsd:annotation>
+                    </enumeration>
                     <enumeration value="PROCESSTYPE_ELEMENT_NOT_SUPPORTED">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, processType, elementType</xsd:documentation></xsd:annotation>
                     </enumeration>
                     <enumeration value="PROCESSTYPE_NOT_SUPPORTED">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, processType</xsd:documentation></xsd:annotation>
                     </enumeration>
+                    <enumeration value="PROCESSTYPE_SCREEN_FIELDTYPE_NOT_SUPPORTED">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, processType, fieldType</xsd:documentation></xsd:annotation>
+                    </enumeration>
                     <enumeration value="PROCESS_TYPE_INCOMPATIBLE">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, currentProcessType, flowName, incompatibleProcessType</xsd:documentation></xsd:annotation>
+                    </enumeration>
+                    <enumeration value="RECOMMENDATION_STRATEGY_EXCEPTION">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: errorArguments, errorCode</xsd:documentation></xsd:annotation>
                     </enumeration>
                     <enumeration value="RECORDFILTER_ENCRYPTED_FIELDS_NOT_SUPPORTED">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, fieldName</xsd:documentation></xsd:annotation>
@@ -1406,6 +1428,9 @@ All Rights Reserved
                     </enumeration>
                     <enumeration value="SPECIFIC_FIELD_VALUE_MAKES_OTHER_FIELD_REQUIRED">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, fieldName, fieldType, requiedField</xsd:documentation></xsd:annotation>
+                    </enumeration>
+                    <enumeration value="STAGE_NAME_NOT_FULLY_QUALIFIED">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, fieldName, parameterName</xsd:documentation></xsd:annotation>
                     </enumeration>
                     <enumeration value="START_ELEMENT_MISSING">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity</xsd:documentation></xsd:annotation>
@@ -2454,6 +2479,17 @@ All Rights Reserved
                     <enumeration value="Masculine"/>
                     <enumeration value="Feminine"/>
                     <enumeration value="AnimateMasculine"/>
+                    <enumeration value="ClassI"/>
+                    <enumeration value="ClassIII"/>
+                    <enumeration value="ClassV"/>
+                    <enumeration value="ClassVII"/>
+                    <enumeration value="ClassIX"/>
+                    <enumeration value="ClassXI"/>
+                    <enumeration value="ClassXIV"/>
+                    <enumeration value="ClassXV"/>
+                    <enumeration value="ClassXVI"/>
+                    <enumeration value="ClassXVII"/>
+                    <enumeration value="ClassXVIII"/>
                 </restriction>
             </simpleType>
             <simpleType name="GrammaticalNumber">
@@ -3914,7 +3950,9 @@ All Rights Reserved
 
             <element name="describeSearchScopeOrder">
                 <complexType>
-                    <sequence/>
+                    <sequence>
+                        <element name="includeRealTimeEntities" type="xsd:boolean" minOccurs="0" maxOccurs="1"/>
+                    </sequence>
                 </complexType>
             </element>
             <element name="describeSearchScopeOrderResponse">
@@ -4775,6 +4813,16 @@ All Rights Reserved
 
 
 
+        <element name="CurrencyConversionHeader">
+            <complexType>
+                <sequence>
+                    <element name="skipCurrencyConversion" type="xsd:boolean" />
+                </sequence>
+            </complexType>
+        </element>
+
+
+
         <element name="DuplicateRuleHeader">
             <complexType>
                 <sequence>
@@ -4865,9 +4913,13 @@ All Rights Reserved
                     <enumeration value="TransferNotesAndAttachments"/>
                     <enumeration value="TransferOthersOpenOpportunities"/>
                     <enumeration value="TransferOwnedOpenOpportunities"/>
+                    <enumeration value="TransferOwnedClosedOpportunities"/>
+                    <enumeration value="TransferOwnedOpenCases"/>
+                    <enumeration value="TransferAllOwnedCases"/>
                     <enumeration value="TransferContracts"/>
                     <enumeration value="TransferOrders"/>
                     <enumeration value="TransferContacts"/>
+                    <enumeration value="KeepAccountTeam"/>
                     <enumeration value="KeepSalesTeam"/>
                     <enumeration value="KeepSalesTeamGrantCurrentOwnerReadWriteAccess"/>
                 </restriction>
@@ -4889,6 +4941,7 @@ All Rights Reserved
                    </sequence>
                 </complexType>
             </element>
+
 
         </schema>
 
@@ -5072,9 +5125,12 @@ All Rights Reserved
                     <enumeration value="TOO_MANY_RECIPIENTS"/>
                     <enumeration value="TOO_MANY_RECORDS"/>
                     <enumeration value="TRIAL_EXPIRED"/>
+                    <enumeration value="TXN_SECURITY_APEX_ERROR"/>
                     <enumeration value="TXN_SECURITY_END_A_SESSION"/>
                     <enumeration value="TXN_SECURITY_FAIL_CLOSE"/>
+                    <enumeration value="TXN_SECURITY_METERING_ERROR"/>
                     <enumeration value="TXN_SECURITY_NO_ACCESS"/>
+                    <enumeration value="TXN_SECURITY_RUNTIME_ERROR"/>
                     <enumeration value="TXN_SECURITY_TWO_FA_REQUIRED"/>
                     <enumeration value="UNABLE_TO_LOCK_ROW"/>
                     <enumeration value="UNKNOWN_ATTACHMENT_EXCEPTION"/>
@@ -5265,9 +5321,12 @@ All Rights Reserved
                     <enumeration value="fns:TOO_MANY_RECIPIENTS"/>
                     <enumeration value="fns:TOO_MANY_RECORDS"/>
                     <enumeration value="fns:TRIAL_EXPIRED"/>
+                    <enumeration value="fns:TXN_SECURITY_APEX_ERROR"/>
                     <enumeration value="fns:TXN_SECURITY_END_A_SESSION"/>
                     <enumeration value="fns:TXN_SECURITY_FAIL_CLOSE"/>
+                    <enumeration value="fns:TXN_SECURITY_METERING_ERROR"/>
                     <enumeration value="fns:TXN_SECURITY_NO_ACCESS"/>
+                    <enumeration value="fns:TXN_SECURITY_RUNTIME_ERROR"/>
                     <enumeration value="fns:TXN_SECURITY_TWO_FA_REQUIRED"/>
                     <enumeration value="fns:UNABLE_TO_LOCK_ROW"/>
                     <enumeration value="fns:UNKNOWN_ATTACHMENT_EXCEPTION"/>
@@ -5419,6 +5478,7 @@ All Rights Reserved
         <part element="tns:LocaleOptions"                name="LocaleOptions"/>
 
         <part element="tns:OwnerChangeOptions"           name="OwnerChangeOptions"/>
+
 
     </message>
 
@@ -7624,7 +7684,7 @@ All Rights Reserved
     <service name="SforceService">
         <documentation>Sforce SOAP API</documentation>
         <port binding="tns:SoapBinding" name="Soap">
-            <soap:address location="https://login.salesforce.com/services/Soap/u/44.0"/>
+            <soap:address location="https://login.salesforce.com/services/Soap/u/45.0"/>
         </port>
     </service>
 </definitions>
