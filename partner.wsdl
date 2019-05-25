@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Salesforce.com Partner Web Services API Version 45.0
-Generated on 2019-01-12 19:41:22 +0000.
+Salesforce.com Partner Web Services API Version 46.0
+Generated on 2019-05-25 18:26:50 +0000.
 
 Copyright 1999-2019 salesforce.com, inc.
 All Rights Reserved
@@ -45,7 +45,9 @@ All Rights Reserved
                 </restriction>
             </simpleType>
 
-            
+            <simpleType name="json">
+                <restriction base="xsd:string"/>
+            </simpleType>
 
             <!-- Compound datatype: Address -->
             <complexType name="address">
@@ -549,7 +551,9 @@ All Rights Reserved
                     <enumeration value="INVALID_PAYLOAD_VERSION"/>
                     <enumeration value="INVALID_PERSON_ACCOUNT_OPERATION"/>
                     <enumeration value="INVALID_PROVIDER_TYPE"/>
+                    <enumeration value="INVALID_QUERY_KEY"/>
                     <enumeration value="INVALID_QUERY_LOCATOR"/>
+                    <enumeration value="INVALID_QUERY_VALUE"/>
                     <enumeration value="INVALID_READ_ONLY_USER_DML"/>
                     <enumeration value="INVALID_REFRESH_TOKEN"/>
                     <enumeration value="INVALID_RUNTIME_VALUE"/>
@@ -632,9 +636,11 @@ All Rights Reserved
                     <enumeration value="NO_TOKEN_ENDPOINT"/>
                     <enumeration value="NUMBER_OUTSIDE_VALID_RANGE"/>
                     <enumeration value="NUM_HISTORY_FIELDS_BY_SOBJECT_EXCEEDED"/>
+                    <enumeration value="OPERATION_ENQUEUED"/>
                     <enumeration value="OPTED_OUT_OF_MASS_MAIL"/>
                     <enumeration value="OP_WITH_INVALID_USER_TYPE_EXCEPTION"/>
                     <enumeration value="ORCHESTRATION_INVALID"/>
+                    <enumeration value="PACKAGE_DISABLED"/>
                     <enumeration value="PACKAGE_LICENSE_REQUIRED"/>
                     <enumeration value="PACKAGING_API_INSTALL_FAILED"/>
                     <enumeration value="PACKAGING_API_UNINSTALL_FAILED"/>
@@ -655,6 +661,7 @@ All Rights Reserved
                     <enumeration value="PA_URI_SYNTAX_EXCEPTION"/>
                     <enumeration value="PA_VISIBLE_ACTIONS_FILTER_ORDERING_EXCEPTION"/>
                     <enumeration value="PLATFORM_EVENT_PUBLISHING_UNAVAILABLE"/>
+                    <enumeration value="PLATFORM_EVENT_PUBLISH_FAILED"/>
                     <enumeration value="PORTAL_NO_ACCESS"/>
                     <enumeration value="PORTAL_USER_ALREADY_EXISTS_FOR_CONTACT"/>
                     <enumeration value="PORTAL_USER_CREATION_RESTRICTED_WITH_ENCRYPTION"/>
@@ -705,6 +712,7 @@ All Rights Reserved
                     <enumeration value="TEXT_DATA_OUTSIDE_SUPPORTED_CHARSET"/>
                     <enumeration value="TOO_MANY_APEX_REQUESTS"/>
                     <enumeration value="TOO_MANY_ENUM_VALUE"/>
+                    <enumeration value="TOO_MANY_JOBS"/>
                     <enumeration value="TOO_MANY_POSSIBLE_USERS_EXIST"/>
                     <enumeration value="TRANSFER_REQUIRES_READ"/>
                     <enumeration value="UNABLE_TO_LOCK_ROW"/>
@@ -784,6 +792,9 @@ All Rights Reserved
                     <enumeration value="APEXCLASS_MISSING_INTERFACE">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, apexClassName, parentScreenFieldName</xsd:documentation></xsd:annotation>
                     </enumeration>
+                    <enumeration value="APEX_CLASS_VARIABLE_NOT_FOUND">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, apexClass</xsd:documentation></xsd:annotation>
+                    </enumeration>
                     <enumeration value="ASSIGNMENTITEM_ELEMENT_MISSING_DATATYPE">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, assignmentName, operatorName, elementName</xsd:documentation></xsd:annotation>
                     </enumeration>
@@ -799,17 +810,29 @@ All Rights Reserved
                     <enumeration value="ASSIGNMENTITEM_INCOMPATIBLE_DATATYPES">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, assignmentName, operatorName, leftElementName, leftElementType, rightElementName, rightElementType</xsd:documentation></xsd:annotation>
                     </enumeration>
+                    <enumeration value="ASSIGNMENTITEM_INVALID_ASSIGNTOREFERENCE">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, assignmentName</xsd:documentation></xsd:annotation>
+                    </enumeration>
                     <enumeration value="ASSIGNMENTITEM_INVALID_COLLECTION">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, assignmentName, operatorName, leftElementName, rightElementName</xsd:documentation></xsd:annotation>
                     </enumeration>
                     <enumeration value="ASSIGNMENTITEM_INVALID_DATATYPE_IN_ELEMENT">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, elementName, dataType, incompatibleDataType</xsd:documentation></xsd:annotation>
                     </enumeration>
+                    <enumeration value="ASSIGNMENTITEM_INVALID_ELEMENTREFERENCE">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, assignmentName</xsd:documentation></xsd:annotation>
+                    </enumeration>
                     <enumeration value="ASSIGNMENTITEM_INVALID_MERGE_FIELD">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, parameterName, operatorName</xsd:documentation></xsd:annotation>
                     </enumeration>
+                    <enumeration value="ASSIGNMENTITEM_INVALID_OPERATOR">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, assignmentName</xsd:documentation></xsd:annotation>
+                    </enumeration>
                     <enumeration value="ASSIGNMENTITEM_INVALID_REFERENCE">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, parameterName, operatorName</xsd:documentation></xsd:annotation>
+                    </enumeration>
+                    <enumeration value="ASSIGNMENTITEM_INVALID_VALUE">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, assignmentName</xsd:documentation></xsd:annotation>
                     </enumeration>
                     <enumeration value="ASSIGNMENTITEM_LEFT_DATATYPE_INVALID_FOR_OPERATOR">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, assignmentName, operatorName, dataType, elementName</xsd:documentation></xsd:annotation>
@@ -936,6 +959,9 @@ All Rights Reserved
                     </enumeration>
                     <enumeration value="DATATYPE_MISSING">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, elementName</xsd:documentation></xsd:annotation>
+                    </enumeration>
+                    <enumeration value="DATA_TYPE_NOT_SUPPORTED_FOR_PROCESSTYPE">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, processType, dataType, elementType</xsd:documentation></xsd:annotation>
                     </enumeration>
                     <enumeration value="DECISION_DEFAULT_CONNECTOR_MISSING_LABEL">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, flowDecision</xsd:documentation></xsd:annotation>
@@ -1123,8 +1149,14 @@ All Rights Reserved
                     <enumeration value="FLOW_STAGE_ORDER_OUT_OF_RANGE">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, stageName, invalidStageOrder, maxOrder, minOrder</xsd:documentation></xsd:annotation>
                     </enumeration>
+                    <enumeration value="FORMULA_CMT_LIMIT_EXCEEDED">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, formulaExpression</xsd:documentation></xsd:annotation>
+                    </enumeration>
                     <enumeration value="FORMULA_EXPRESSION_INVALID">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, formulaExpression</xsd:documentation></xsd:annotation>
+                    </enumeration>
+                    <enumeration value="GLOBAL_VARIABLE_NOT_SUPPORTED_FOR_PROCESSTYPE">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, processType, systemVariable</xsd:documentation></xsd:annotation>
                     </enumeration>
                     <enumeration value="INPUTPARAM_INCOMPATIBLE_DATATYPE">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, parameterName</xsd:documentation></xsd:annotation>
@@ -1519,6 +1551,9 @@ All Rights Reserved
                     <enumeration value="SUBFLOW_OUTPUT_VARIABLE_NO_OUTPUT_ACCESS">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, subflowName, variableName</xsd:documentation></xsd:annotation>
                     </enumeration>
+                    <enumeration value="SUBFLOW_PROCESSTYPE_NOT_SUPPORTED">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, processType, subflowElementName, subflowName, subflowProcessType</xsd:documentation></xsd:annotation>
+                    </enumeration>
                     <enumeration value="SUBFLOW_PROCESS_TYPE_INCOMPATIBLE">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, subflowName, flowName, processType</xsd:documentation></xsd:annotation>
                     </enumeration>
@@ -1590,6 +1625,9 @@ All Rights Reserved
                     </enumeration>
                     <enumeration value="VARIABLE_SCALE_NULL">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, elementName</xsd:documentation></xsd:annotation>
+                    </enumeration>
+                    <enumeration value="VISIBILITY_RULE_NOT_SUPPORTED">
+                        <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity</xsd:documentation></xsd:annotation>
                     </enumeration>
                     <enumeration value="WAITEVENT_DEFAULT_CONNECTOR_MISSING_LABEL">
                         <xsd:annotation><xsd:documentation>Errors with this extended error code have the following properties: severity, waitEventName</xsd:documentation></xsd:annotation>
@@ -1971,6 +2009,7 @@ All Rights Reserved
                     <element name="createable"          type="xsd:boolean"/>
                     <element name="custom"              type="xsd:boolean"/>
                     <element name="customSetting"       type="xsd:boolean"/>
+                    <element name="dataTranslationEnabled" type="xsd:boolean" minOccurs="0"/>
                     <element name="deletable"           type="xsd:boolean"/>
                     <element name="deprecatedAndHidden" type="xsd:boolean"/>
                     <element name="feedEnabled"         type="xsd:boolean"/>
@@ -2012,6 +2051,7 @@ All Rights Reserved
                     <element name="createable"          type="xsd:boolean"/>
                     <element name="custom"              type="xsd:boolean"/>
                     <element name="customSetting"       type="xsd:boolean"/>
+                    <element name="dataTranslationEnabled" type="xsd:boolean" minOccurs="0"/>
                     <element name="deletable"           type="xsd:boolean"/>
                     <element name="deprecatedAndHidden" type="xsd:boolean"/>
                     <element name="feedEnabled"         type="xsd:boolean"/>
@@ -2140,7 +2180,7 @@ All Rights Reserved
                     <enumeration value="location"/>
                     <enumeration value="address"/>
                     <enumeration value="anyType"/> <!-- can be string, picklist, reference, boolean, currency, int, double, percent, id, date, datetime, url, email -->
-
+                    <enumeration value="json"/>
 
                     <enumeration value="complexvalue"/>
 
@@ -2166,6 +2206,8 @@ All Rights Reserved
                     <enumeration value="tns:address" />
 
                     <enumeration value="xsd:anyType"/> <!-- can be id, booolean, double, int, string, date, dateTime -->
+
+                    <enumeration value="tns:json" />
 
 
                     <enumeration value="urn:RelationshipReferenceTo" />
@@ -2217,6 +2259,7 @@ All Rights Reserved
                     <element name="controllerName"             type="xsd:string" minOccurs="0"/>
                     <element name="createable"                 type="xsd:boolean"/>
                     <element name="custom"                     type="xsd:boolean"/>
+                    <element name="dataTranslationEnabled"     type="xsd:boolean" minOccurs="0"/>
                     <element name="defaultValue"               type="xsd:anyType" minOccurs="0"/>
                     <element name="defaultValueFormula"        type="xsd:string" minOccurs="0"/>
                     <element name="defaultedOnCreate"          type="xsd:boolean"/>
@@ -2326,7 +2369,9 @@ All Rights Reserved
                        <element name="mappedField"           type="xsd:string" />
                    </sequence>
             </complexType>
-            
+           
+
+     
 
 
             <complexType name="KnowledgeSettings">
@@ -2496,6 +2541,7 @@ All Rights Reserved
                 <restriction base="xsd:string">
                     <enumeration value="Singular"/>
                     <enumeration value="Plural"/>
+                    <enumeration value="Dual"/>
                 </restriction>
             </simpleType>
             <simpleType name="Possessive">
@@ -3607,6 +3653,7 @@ All Rights Reserved
                     </sequence>
                 </complexType>
             </element>
+
 
 
 
@@ -4813,16 +4860,6 @@ All Rights Reserved
 
 
 
-        <element name="CurrencyConversionHeader">
-            <complexType>
-                <sequence>
-                    <element name="skipCurrencyConversion" type="xsd:boolean" />
-                </sequence>
-            </complexType>
-        </element>
-
-
-
         <element name="DuplicateRuleHeader">
             <complexType>
                 <sequence>
@@ -4963,6 +5000,7 @@ All Rights Reserved
                     <enumeration value="CANNOT_DELETE_OWNER"/>
                     <enumeration value="CANT_ADD_STANDADRD_PORTAL_USER_TO_TERRITORY"/>
                     <enumeration value="CANT_ADD_STANDARD_PORTAL_USER_TO_TERRITORY"/>
+                    <enumeration value="CATEGORY_NOT_FOUND"/>
                     <enumeration value="CIRCULAR_OBJECT_GRAPH"/>
                     <enumeration value="CLIENT_NOT_ACCESSIBLE_FOR_USER"/>
                     <enumeration value="CLIENT_REQUIRE_UPDATE_FOR_USER"/>
@@ -5058,8 +5096,10 @@ All Rights Reserved
                     <enumeration value="INVALID_PACKAGE_VERSION"/>
                     <enumeration value="INVALID_PAGING_OPTION"/>
                     <enumeration value="INVALID_QUERY_FILTER_OPERATOR"/>
+                    <enumeration value="INVALID_QUERY_KEY"/>
                     <enumeration value="INVALID_QUERY_LOCATOR"/>
                     <enumeration value="INVALID_QUERY_SCOPE"/>
+                    <enumeration value="INVALID_QUERY_VALUE"/>
                     <enumeration value="INVALID_REPLICATION_DATE"/>
                     <enumeration value="INVALID_SEARCH"/>
                     <enumeration value="INVALID_SEARCH_SCOPE"/>
@@ -5089,6 +5129,7 @@ All Rights Reserved
                     <enumeration value="MISSING_ARGUMENT"/>
                     <enumeration value="MISSING_RECORD"/>
                     <enumeration value="MODIFIED"/>
+                    <enumeration value="MULTIPLE_RECORDS_FOUND"/>
                     <enumeration value="MUTUAL_AUTHENTICATION_FAILED"/>
                     <enumeration value="NOT_ACCEPTABLE"/>
                     <enumeration value="NOT_MODIFIED"/>
@@ -5105,12 +5146,14 @@ All Rights Reserved
                     <enumeration value="PASSWORD_LOCKOUT"/>
                     <enumeration value="PORTAL_NO_ACCESS"/>
                     <enumeration value="POST_BODY_PARSE_ERROR"/>
+                    <enumeration value="PRODUCT_NOT_FOUND"/>
                     <enumeration value="QAT_HETEROGENOUS_CONTEXT_IDS"/>
                     <enumeration value="QAT_INVALID_CONTEXT_ID"/>
                     <enumeration value="QAT_INVALID_QUICK_ACTION"/>
                     <enumeration value="QUERY_TIMEOUT"/>
                     <enumeration value="QUERY_TOO_COMPLICATED"/>
                     <enumeration value="REALTIME_PROCESSING_TIME_EXCEEDED_LIMIT"/>
+                    <enumeration value="RECORD_NOT_FOUND"/>
                     <enumeration value="REQUEST_LIMIT_EXCEEDED"/>
                     <enumeration value="REQUEST_RUNNING_TOO_LONG"/>
                     <enumeration value="SERVER_UNAVAILABLE"/>
@@ -5122,6 +5165,7 @@ All Rights Reserved
                     <enumeration value="SST_ADMIN_FILE_DOWNLOAD_EXCEPTION"/>
                     <enumeration value="STATE_TRANSITION_NOT_ALLOWED"/>
                     <enumeration value="TOO_MANY_APEX_REQUESTS"/>
+                    <enumeration value="TOO_MANY_JOBS"/>
                     <enumeration value="TOO_MANY_RECIPIENTS"/>
                     <enumeration value="TOO_MANY_RECORDS"/>
                     <enumeration value="TRIAL_EXPIRED"/>
@@ -5140,6 +5184,7 @@ All Rights Reserved
                     <enumeration value="UNSUPPORTED_ATTACHMENT_ENCODING"/>
                     <enumeration value="UNSUPPORTED_CLIENT"/>
                     <enumeration value="UNSUPPORTED_MEDIA_TYPE"/>
+                    <enumeration value="WEBSTORE_NOT_FOUND"/>
                     <enumeration value="XML_PARSER_ERROR"/>
                 </restriction>
             </simpleType>
@@ -5159,6 +5204,7 @@ All Rights Reserved
                     <enumeration value="fns:CANNOT_DELETE_OWNER"/>
                     <enumeration value="fns:CANT_ADD_STANDADRD_PORTAL_USER_TO_TERRITORY"/>
                     <enumeration value="fns:CANT_ADD_STANDARD_PORTAL_USER_TO_TERRITORY"/>
+                    <enumeration value="fns:CATEGORY_NOT_FOUND"/>
                     <enumeration value="fns:CIRCULAR_OBJECT_GRAPH"/>
                     <enumeration value="fns:CLIENT_NOT_ACCESSIBLE_FOR_USER"/>
                     <enumeration value="fns:CLIENT_REQUIRE_UPDATE_FOR_USER"/>
@@ -5254,8 +5300,10 @@ All Rights Reserved
                     <enumeration value="fns:INVALID_PACKAGE_VERSION"/>
                     <enumeration value="fns:INVALID_PAGING_OPTION"/>
                     <enumeration value="fns:INVALID_QUERY_FILTER_OPERATOR"/>
+                    <enumeration value="fns:INVALID_QUERY_KEY"/>
                     <enumeration value="fns:INVALID_QUERY_LOCATOR"/>
                     <enumeration value="fns:INVALID_QUERY_SCOPE"/>
+                    <enumeration value="fns:INVALID_QUERY_VALUE"/>
                     <enumeration value="fns:INVALID_REPLICATION_DATE"/>
                     <enumeration value="fns:INVALID_SEARCH"/>
                     <enumeration value="fns:INVALID_SEARCH_SCOPE"/>
@@ -5285,6 +5333,7 @@ All Rights Reserved
                     <enumeration value="fns:MISSING_ARGUMENT"/>
                     <enumeration value="fns:MISSING_RECORD"/>
                     <enumeration value="fns:MODIFIED"/>
+                    <enumeration value="fns:MULTIPLE_RECORDS_FOUND"/>
                     <enumeration value="fns:MUTUAL_AUTHENTICATION_FAILED"/>
                     <enumeration value="fns:NOT_ACCEPTABLE"/>
                     <enumeration value="fns:NOT_MODIFIED"/>
@@ -5301,12 +5350,14 @@ All Rights Reserved
                     <enumeration value="fns:PASSWORD_LOCKOUT"/>
                     <enumeration value="fns:PORTAL_NO_ACCESS"/>
                     <enumeration value="fns:POST_BODY_PARSE_ERROR"/>
+                    <enumeration value="fns:PRODUCT_NOT_FOUND"/>
                     <enumeration value="fns:QAT_HETEROGENOUS_CONTEXT_IDS"/>
                     <enumeration value="fns:QAT_INVALID_CONTEXT_ID"/>
                     <enumeration value="fns:QAT_INVALID_QUICK_ACTION"/>
                     <enumeration value="fns:QUERY_TIMEOUT"/>
                     <enumeration value="fns:QUERY_TOO_COMPLICATED"/>
                     <enumeration value="fns:REALTIME_PROCESSING_TIME_EXCEEDED_LIMIT"/>
+                    <enumeration value="fns:RECORD_NOT_FOUND"/>
                     <enumeration value="fns:REQUEST_LIMIT_EXCEEDED"/>
                     <enumeration value="fns:REQUEST_RUNNING_TOO_LONG"/>
                     <enumeration value="fns:SERVER_UNAVAILABLE"/>
@@ -5318,6 +5369,7 @@ All Rights Reserved
                     <enumeration value="fns:SST_ADMIN_FILE_DOWNLOAD_EXCEPTION"/>
                     <enumeration value="fns:STATE_TRANSITION_NOT_ALLOWED"/>
                     <enumeration value="fns:TOO_MANY_APEX_REQUESTS"/>
+                    <enumeration value="fns:TOO_MANY_JOBS"/>
                     <enumeration value="fns:TOO_MANY_RECIPIENTS"/>
                     <enumeration value="fns:TOO_MANY_RECORDS"/>
                     <enumeration value="fns:TRIAL_EXPIRED"/>
@@ -5336,6 +5388,7 @@ All Rights Reserved
                     <enumeration value="fns:UNSUPPORTED_ATTACHMENT_ENCODING"/>
                     <enumeration value="fns:UNSUPPORTED_CLIENT"/>
                     <enumeration value="fns:UNSUPPORTED_MEDIA_TYPE"/>
+                    <enumeration value="fns:WEBSTORE_NOT_FOUND"/>
                     <enumeration value="fns:XML_PARSER_ERROR"/>
                 </restriction>
             </simpleType>
@@ -7684,7 +7737,8 @@ All Rights Reserved
     <service name="SforceService">
         <documentation>Sforce SOAP API</documentation>
         <port binding="tns:SoapBinding" name="Soap">
-            <soap:address location="https://login.salesforce.com/services/Soap/u/45.0"/>
+            <soap:address location="https://login.salesforce.com/services/Soap/u/46.0"/>
         </port>
     </service>
 </definitions>
+
