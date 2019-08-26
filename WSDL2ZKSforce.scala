@@ -870,7 +870,7 @@ class BaseClientWriter(allOperations: Seq[Operation], headers: Seq[ComplexTypePr
 		w.println("@implementation ZKSforceBaseClient")
 		w.println()
 		w.println("-(id)copyWithZone:(nullable NSZone *)zone {")
-		w.println("	ZKSforceBaseClient* c = [[self class] alloc];")
+		w.println("	ZKSforceBaseClient *c = [super copyWithZone:zone];")
 		w.println("	c.authSource = self.authSource;")
 		for (h <- headers) {
 			w.println(s"""	c.${h.propertyName} = self.${h.propertyName};""")
