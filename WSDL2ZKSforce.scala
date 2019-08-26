@@ -708,7 +708,7 @@ class BaseStubWriter(val allOperations: Seq[Operation]) {
 class SyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allOperations) {
 
 	override def filterOps(allOperations:Seq[Operation]) : Seq[Operation] = {
-		val toSkip = Set("login", "describeSObject", "create", "update", "describeGlobal", "search", "retrieve")
+		val toSkip = Set("login", "describeSObject", "create", "update", "describeGlobal", "search")
 		allOperations.filter(x => !toSkip.contains(x.name))
 	}
 
