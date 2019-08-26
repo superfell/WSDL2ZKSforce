@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2018 Simon Fell
+// Copyright (c) 2013-2019 Simon Fell
 //
 // Permission is hereby granted, free of charge, to any person obtaining a 
 // copy of this software and associated documentation files (the "Software"), 
@@ -70,6 +70,10 @@ class SourceWriter(val file: File) {
 		w.println(s"@class $c;")
 	}
 	
+	def printProtocolForwardDecl(p: String) {
+		w.println(s"@protocol $p;")
+	}
+
 	// reads the first line of the copyright from the current matching source file in the zkSforce tree, if it exists.
 	private def getOriginalCopyright(file: File): String = {
 		val src = new File(file.getParentFile(), "../../zkSforce/zkSforce/" + file.getName())
@@ -113,7 +117,7 @@ class SourceWriter(val file: File) {
 }
 
 // Each mapping from an XML based Type to an Objective-C type we need to generate is represented by a TypeInfo
-// TypeInfo has a heirarchy for different types of types (e.g. arrays, classes, etc)
+// TypeInfo has a hierarchy for different types of types (e.g. arrays, classes, etc)
 class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val isPointer: Boolean) {
 	
 	// additional comment that'll get added to a property declaration of this type.
@@ -139,7 +143,11 @@ class TypeInfo(val xmlName: String, val objcName: String, accessor: String, val 
 	
 	// returns an accessor that returns an instance of this type (when deserializing xml)
 	def accessor(instanceName: String, elemName: String): String = {
-		s"""[$instanceName $accessor:@"$elemName"]"""
+		if (accessor != "") {
+			s"""[$instanceName $accessor:@"$elemName"]"""
+		} else {
+			s""
+		}
 	}
 	
 	// returns the name of the method that is used to serialize an instance of this type
@@ -176,13 +184,14 @@ class ArrayTypeInfo(val componentType: TypeInfo) extends TypeInfo(componentType.
 val reservedWords = Set("inline")
 
 // A property of a complexType (aka Class)
-class ComplexTypeProperty(name: String, val propType: TypeInfo, val nillable: Boolean, val optional:Boolean) {
+class ComplexTypeProperty(elemName: String, propName: String, val propType: TypeInfo, val nillable: Boolean, val optional:Boolean) {
 	
-	val elementName = name
-	val propertyName = makePropertyName(name)
+	val elementName = elemName
+	val propertyName = makePropertyName(elemName, propName)
 
-	private def makePropertyName(name:String) : String = {
-		if (reservedWords.contains(name)) "_" + name else name
+	private def makePropertyName(elemName: String, propName: String) : String = {
+		val n = if (propName == "") elemName else propName
+		if (reservedWords.contains(n)) "_" + n else n
 	}
 	
 	def initializer(nameOfZKElementInstance: String): String = {
@@ -555,7 +564,7 @@ class VoidTypeInfo() extends TypeInfo("void", "void", "", false) {
 	}
 }
 
-class Operation(val name: String, val description: String, val params: Seq[ComplexTypeProperty], val returnType:TypeInfo, val inputHeaders: Seq[String] ) {
+class Operation(val name: String, val description: String, val params: Seq[ComplexTypeProperty], val returnType:TypeInfo, val inputHeaders: Seq[ComplexTypeProperty] ) {
 	
 	def objcSignature(): String = {
 		s"-(${returnType.fullTypeName})$name${paramList}"
@@ -571,29 +580,47 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 		val nullValue = if (returnType.objcName == "void") "" else "nil"
 		w.println(s"""/** $description */
 					|$objcSignature {
-					|	if (!authSource) return $nullValue;
+					|	if (!self.authSource) return $nullValue;
 					|	[self checkSession];
-					|	ZKEnvelope *env = [[ZKPartnerEnvelope alloc] initWithSessionHeader:authSource.sessionId];""".stripMargin('|'))
-		for (h <- inputHeaders.filter(_ != "SessionHeader"))
-			w.println(s"	[self add${h}:env];")
-		w.println(s"""|	[env moveToBody];
-				    |	[env startElement:@"${name}"];""".stripMargin('|'));
-		writeFieldSerializers("env", "", w, params)
-		val retStmt = returnType.accessor("deser", "result")
-		w.println(s"""	[env endElement:@"${name}"];""")
+					|	NSString *payload = [self ${makeEnvMethodName}${callSyncParamList}];""".stripMargin('|'))
+
 		if (returnType.objcName == "void") {
-			w.println("""	[self sendRequest:env.end name:NSStringFromSelector(_cmd)];
-						|}
-						|""".stripMargin('|'))
+			w.println("""|	[self sendRequest:payload name:NSStringFromSelector(_cmd) returnRoot:YES];
+						 |}""".stripMargin('|'))
 		} else {
-			w.println(s"""	zkElement *rn = [self sendRequest:env.end name:NSStringFromSelector(_cmd)];
-					 |	ZKXmlDeserializer *deser = [[ZKXmlDeserializer alloc] initWithXmlElement:rn];
-					 |	return $retStmt;
+			w.println(s"""	zkElement *root = [self sendRequest:payload name:NSStringFromSelector(_cmd) returnRoot:YES];
+					 |	return [self ${makeResultMethodName}:root];
 					 |}
 					 |""".stripMargin('|'))
 		}
 	}
 	
+	def writeMakeEnvMethodImpl(w: SourceWriter) {
+		w.println(makeEnvMethodSignature() + " {")
+		w.println("	ZKEnvelope *env = [[ZKPartnerEnvelope alloc] initWithSessionHeader:self.authSource.sessionId];")
+		writeFieldSerializers("env", "self", w, inputHeaders.filter(_.elementName != "SessionHeader"))
+		w.println(s"""|	[env moveToBody];
+				      |	[env startElement:@"${name}"];""".stripMargin('|'))
+		writeFieldSerializers("env", "", w, params)
+		w.println(s"""|	[env endElement:@"${name}"];
+					  |	return env.end;
+					  |}""".stripMargin('|'))
+	}
+
+	def writeMakeResultMethodImpl(w: SourceWriter) {
+		w.println(makeResultMethodSignature() + " {")
+		val retStmt = returnType.accessor("deser", "result")
+		if (retStmt != "") {
+			w.println(s"""|	zkElement *body = [root childElement:@"Body" ns:NS_SOAP_ENV];
+				|	ZKXmlDeserializer *deser = [[ZKXmlDeserializer alloc] initWithXmlElement:body.childElements[0]];
+				|	return $retStmt;""".stripMargin('|'))
+		} else if (returnType.objcName != "void") {
+			w.println(s"""	NSAssert(NO, @"subclass is expected to override this method");""")
+			w.println("	return nil;")
+		}
+		w.println("}")
+	}
+
 	def types():Seq[TypeInfo] = {
 		returnType +: params.map(_.propType) 
 	}
@@ -606,15 +633,31 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 		first + " " + params.tail.map(_.parameterDecl).mkString(" ")
 	}
 	
-	// what we'd need to call teh sync version of this operation, e.g. :soql or :soql foo:bar
+	// what we'd need to call the sync version of this operation, e.g. :soql or :soql foo:bar
 	def callSyncParamList():String = {
 		if (params.length == 0) return ""
 		val fp = params(0)
 		val first = s":${fp.propertyName}"
 		if (params.length == 1) return first;
-		first + params.tail.map(x => (" " + x.propertyName + ":" + x.propertyName)).mkString(" ");
+		first + params.tail.map(x => (" " + x.propertyName + ":" + x.propertyName)).mkString("");
 	}
 	
+	def makeEnvMethodName():String = {
+		s"""make${name.capitalize}Env"""
+	}
+
+	def makeEnvMethodSignature():String = {
+		s"""-(NSString *)${makeEnvMethodName}${paramList}"""
+	}
+
+	def makeResultMethodName():String = {
+		s"""make${name.capitalize}Result"""
+	}
+
+	def makeResultMethodSignature():String = {
+		s"""-(${returnType.fullTypeName})${makeResultMethodName}:(zkElement *)root"""
+	}
+
 	def blockMethodSignature():String = {
 		val cp = name.length + 15
 		if (params.length == 0)
@@ -745,81 +788,100 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				|	return YES;
 				|}
 				|
-				|
-				|// This method implements the meat of all the perform* calls,
-				|// it handles making the relevant call in any desired queue, 
-				|// and then calling the fail or complete block on the UI thread.
-				|//
-				|-(void)performRequest:(id (^)(void))requestBlock
-				|         checkSession:(BOOL)checkSession
-				|            failBlock:(zkFailWithExceptionBlock)failBlock 
-				|        completeBlock:(void (^)(id))completeBlock
-				|                queue:(dispatch_queue_t)queue {
-				|
-				|    if (!requestBlock) return;
-				|
-				|    // sanity check that we're actually logged in and ready to go.
-				|    if (checkSession && (![self confirmLoggedIn])) return;
-				|
-				|    // run this block async on the desired queue
-				|    dispatch_async(queue, ^{
-				|        id result;
-				|				
-				|        @try {
-				|            result = requestBlock();
-				|        } @catch (NSException *ex) {
-				|            // run the failBlock on the main thread.
-				|            if (failBlock) {
-				|                dispatch_async(dispatch_get_main_queue(), ^{
-				|                    failBlock(ex);
-				|                });
-				|            }
-				|
-				|            return;
-				|        }
-				|
-				|        // run the completeBlock on the main thread.
-				|        if (completeBlock) {
-				|            dispatch_async(dispatch_get_main_queue(), ^{            
-				|                completeBlock(result);
-				|            });
-				|        }
-				|    });
-				|}
-				|
-				|// Perform an asynchronous API call. 
-				|// Defaults to the default background global queue.
-				|//
-				|-(void)performRequest:(id (^)(void))requestBlock
-				|         checkSession:(BOOL)checkSession
-				|            failBlock:(zkFailWithExceptionBlock)failBlock 
-				|        completeBlock:(void (^)(id))completeBlock {
-				|
-				|    [self performRequest:requestBlock
-				|            checkSession:checkSession
-				|               failBlock:failBlock
-				|           completeBlock:completeBlock
-				|                   queue:dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT,0)];
+				|-(BOOL)handledError:(NSException *)ex failBlock:(zkFailWithExceptionBlock)failBlock {
+    			|	if (ex == nil) {
+        		|		return NO;
+    			|	}
+    			|	if (failBlock != nil) {
+        		|		dispatch_async(dispatch_get_main_queue(), ^{
+            	|			failBlock(ex);
+        		|		});
+    			|	}
+    			|	return YES;
 				|}
 				|""".stripMargin('|'))
 		for (op <- operations) {
-			val syncCall = s"[self ${op.name}${op.callSyncParamList}];"
-			val call = if (op.returnType.objcName == "void") syncCall + "\n			return nil;" else "return " + syncCall
-			val completeBlock = if (op.returnType.objcName == "void") "completeBlock()" else s"completeBlock((${op.returnType.fullTypeName})r)"
-			val checkSession = if (op.inputHeaders.contains("SessionHeader")) "YES" else "NO"
+			val completeBlock = if (op.returnType.objcName == "void") "completeBlock()" else s"completeBlock(result)"
+			val makeResult = if (op.returnType.objcName == "void") "" else s"${op.returnType.fullTypeName} result = [self ${op.makeResultMethodName}:root];"
+			val checkSession = if (op.inputHeaders.map(_.elementName).contains("SessionHeader")) "YES" else "NO"
 			w.println(op.blockMethodSignature + " {")
 			w.println(s"""
-						|	[self performRequest:^id {
-						|			$call
-						|		}
-						|		 checkSession:$checkSession
-						|		    failBlock:failBlock
-						|		completeBlock:^(id r) {
-						|			if (completeBlock) $completeBlock;
-						|		}];
+						|	NSString *payload = [self ${op.makeEnvMethodName}${op.callSyncParamList}];
+						|	[self startRequest:payload name:@"${op.name}" handler:^(zkElement *root, NSException *ex) {
+        				|		if (![self handledError:ex failBlock:failBlock]) {
+            			|			${makeResult}
+            			|			dispatch_async(dispatch_get_main_queue(), ^{
+                		|				${completeBlock};
+            			|			});
+        				|		}
+						|	}];
 						|}
 						|""".stripMargin('|'))
 
+		}
+		w.println("@end");
+		w.close()
+	}
+}
+
+class EnvBuilderWriter(allOperations: Seq[Operation], headers: Seq[ComplexTypeProperty]) extends BaseStubWriter(allOperations) {
+
+	override def writeHeader() {
+		val w = new SourceWriter(new File(new File("output"), "ZKSforceBaseClient.h"))
+		w.printLicenseComment()
+		w.println()
+		w.printImport("zkBaseClient.h")
+		w.println()
+		w.printProtocolForwardDecl("ZKAuthenticationInfo")
+		w.printClassForwardDecl("zkElement")
+		for (h <- headers)
+			w.printClassForwardDecl(h.propType.objcName)
+		val rts = collection.immutable.TreeSet.empty[String] ++ referencedTypes.filter(_.isGeneratedType).map(_.objcName)
+		for (t <- rts)
+			w.printClassForwardDecl(t)
+		w.println()
+		w.println("@interface ZKSforceBaseClient : ZKBaseClient <NSCopying>")
+		w.println()
+		w.println("@property (strong) NSObject<ZKAuthenticationInfo> *authSource;")
+		w.println()
+		val padTo = headers.map(_.propType.propertyLengthForPaddingCalc(false)).max + 1
+		for (h <- headers) {
+			w.println(h.propertyDecl(padTo, false))
+		}
+		w.println()
+		for (op <- operations) {
+			w.println(op.makeEnvMethodSignature + ";")
+			w.println(op.makeResultMethodSignature +";")
+			w.println()
+		}
+		w.println("@end")
+		w.close()
+	}
+	
+	override def writeImpl() {
+		val w = new SourceWriter(new File(new File("output"), "ZKSforceBaseClient.m"))
+		w.printLicenseComment()
+		w.printImport("ZKSforceBaseClient.h")
+		w.printImport("zkParser.h")
+		w.printImport("ZKPartnerEnvelope.h")
+		w.printImport("ZKAuthenticationInfo.h")
+		w.printImports(referencedTypes)
+		w.println()
+		w.println("@implementation ZKSforceBaseClient")
+		w.println()
+		w.println("-(id)copyWithZone:(nullable NSZone *)zone {")
+		w.println("	ZKSforceBaseClient* c = [[self class] alloc];")
+		w.println("	c.authSource = self.authSource;")
+		for (h <- headers) {
+			w.println(s"""	c.${h.propertyName} = self.${h.propertyName};""")
+		}
+		w.println("	return c;")
+		w.println("}")
+		w.println()
+		for (op <- operations) {
+			op.writeMakeEnvMethodImpl(w)
+			op.writeMakeResultMethodImpl(w)
+			w.println()
 		}
 		w.println("@end");
 		w.close()
@@ -833,7 +895,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	private val simpleTypes = createSimpleTypes(wsdl)
 	private val bindingOperations = createBindingOperations(wsdl)
 	private val operations = collection.mutable.MutableList[Operation]()
-	private val headerNames = collection.mutable.MutableList[String]()
+	private var allHeaders = collection.mutable.MutableList[ComplexTypeProperty]()
 	private val VOID = new VoidTypeInfo()
 	
 	val messages = createMessages(wsdl)
@@ -859,17 +921,18 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		operations += new Operation(name, description, input, opType, headers)
 	}
 	
-	def handleHeader(message:String, partName: String) : String = {
+	def handleHeader(message:String, partName: String) : ComplexTypeProperty = {
 		val msg = messages(message)
 		for (part <- msg \ "part") {
 			if ((part \ "@name").text == partName) {
 				val elmName = stripPrefix((part \ "@element").text)
+				val propName = elmName(0).toLower + elmName.substring(1)
 				val elm = elements(elmName)
 				if (!complexTypes.contains(elmName)) {
 					makeComplexType(elmName, (elm \ "complexType")(0), Direction.Serialize)
-					headerNames += elmName
+					allHeaders += new ComplexTypeProperty(elmName, propName, complexTypes(elmName), false, true);
 				}
-				return elmName
+				return new ComplexTypeProperty(elmName, propName, complexTypes(elmName), false, true);
 			}
 		}
 		return null
@@ -908,6 +971,8 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 				}	
 			}
 		}
+		// sort headers by elementName
+		allHeaders = allHeaders.sortWith(_.elementName < _.elementName)
 	}
 	
 	def complexType(xmlName: String, dir: Direction.Value) : ComplexTypeInfo = {
@@ -919,6 +984,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	def writeClientStub() {
 		new SyncStubWriter(operations).writeClass()
 		new ASyncStubWriter(operations).writeClass()
+		new EnvBuilderWriter(operations, allHeaders).writeClass()
 	}
 	
 	def writeTypes() {
@@ -930,8 +996,8 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 			finalType.writeHeaderFile()
 			finalType.writeImplFile()
 		}
-		for (h <- headerNames)
-			println("Header " + h)
+		for (h <- allHeaders)
+			println("Header " + h.elementName)
 	}
 	
     def writeZKSforceh() {
@@ -1043,7 +1109,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		val t = if (array) new ArrayTypeInfo(singleType) else singleType
 		val optional = (field \ "@minOccurs").text == "0"
 		val nillable = (field \ "@nillable").text == "true"
-		new ComplexTypeProperty(name, t, nillable, optional)
+		new ComplexTypeProperty(name, name, t, nillable, optional)
 	}
 
 	private def getType(xmlName: String, dir: Direction.Value): TypeInfo = {
