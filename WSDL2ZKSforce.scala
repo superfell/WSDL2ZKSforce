@@ -824,7 +824,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 	}
 }
 
-class EnvBuilderWriter(allOperations: Seq[Operation], headers: Seq[ComplexTypeProperty]) extends BaseStubWriter(allOperations) {
+class BaseClientWriter(allOperations: Seq[Operation], headers: Seq[ComplexTypeProperty]) extends BaseStubWriter(allOperations) {
 
 	override def writeHeader() {
 		val w = new SourceWriter(new File(new File("output"), "ZKSforceBaseClient.h"))
@@ -984,7 +984,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 	def writeClientStub() {
 		new SyncStubWriter(operations).writeClass()
 		new ASyncStubWriter(operations).writeClass()
-		new EnvBuilderWriter(operations, allHeaders).writeClass()
+		new BaseClientWriter(operations, allHeaders).writeClass()
 	}
 	
 	def writeTypes() {
