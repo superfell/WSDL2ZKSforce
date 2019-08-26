@@ -913,8 +913,6 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
 		// so we need to fix up our metadata for that
 		if (name == "describeGlobal")
 			opType = new ArrayTypeInfo(getType("DescribeGlobalSObjectResult", Direction.Deserialize))
-		if (name == "search")
-			opType = new ArrayTypeInfo(getType("sObject", Direction.Deserialize))
 		if (name == "retrieve")
 			opType = new TypeInfo("dict", "NSDictionary", "", true)
 			
