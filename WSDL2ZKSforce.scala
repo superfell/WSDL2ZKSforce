@@ -566,13 +566,18 @@ class VoidTypeInfo() extends TypeInfo("void", "void", "", false) {
 
 class Operation(val name: String, val description: String, val params: Seq[ComplexTypeProperty], val returnType:TypeInfo, val inputHeaders: Seq[ComplexTypeProperty] ) {
 	
+	def requiresPrePostCallHooks(): Boolean = {
+		println(name)
+		name == "describeGlobal" || name == "describeSObject"	
+	}
+
 	def objcSignature(): String = {
 		s"-(${returnType.fullTypeName})$name${paramList}"
 	}
 	
 	def writeMethodDecl(w: SourceWriter) {
 		w.println(s"""/** $description */
-					|$objcSignature;
+					|$objcSignature DEPRECATED_MSG_ATTRIBUTE("Please use perform${name.capitalize} instead");
 					|""".stripMargin('|'))
 	}
 	
@@ -581,20 +586,36 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 		w.println(s"""/** $description */
 					|$objcSignature {
 					|	if (!self.authSource) return $nullValue;
-					|	[self checkSession];
-					|	NSString *payload = [self ${makeEnvMethodName}${callSyncParamList}];""".stripMargin('|'))
+					|	[self checkSession];""".stripMargin('|'))
+		preCallSyncHook(w)
+		w.println(s"""	NSString *payload = [self ${makeEnvMethodName}${callSyncParamList}];""")
 
 		if (returnType.objcName == "void") {
 			w.println("""|	[self sendRequest:payload name:NSStringFromSelector(_cmd) returnRoot:YES];
 						 |}""".stripMargin('|'))
 		} else {
-			w.println(s"""	zkElement *root = [self sendRequest:payload name:NSStringFromSelector(_cmd) returnRoot:YES];
-					 |	return [self ${makeResultMethodName}:root];
-					 |}
-					 |""".stripMargin('|'))
+			w.println(s"""|	zkElement *root = [self sendRequest:payload name:NSStringFromSelector(_cmd) returnRoot:YES];
+	  					  |	${returnType.fullTypeName}result = [self ${makeResultMethodName}:root];""".stripMargin('|'))
+			postCallSyncHook(w)
+			w.println(s"""|	return result;
+						  |}
+						  |""".stripMargin('|'))
 		}
 	}
 	
+	def preCallSyncHook(w: SourceWriter) {
+		if (requiresPrePostCallHooks()) {
+			w.println(s"""|	${returnType.fullTypeName}shortcut = [self preHook_${name}${callSyncParamList}];
+						  |	if (shortcut != nil) return shortcut;""".stripMargin('|'))
+		}
+	}
+
+	def postCallSyncHook(w: SourceWriter) {
+		if (requiresPrePostCallHooks()) {
+			w.println(s"""	result = [self postHook_${name}:result];""")
+		}
+	}
+
 	def writeMakeEnvMethodImpl(w: SourceWriter) {
 		w.println(makeEnvMethodSignature() + " {")
 		w.println("	ZKEnvelope *env = [[ZKPartnerEnvelope alloc] initWithSessionHeader:self.authSource.sessionId];")
@@ -708,7 +729,7 @@ class BaseStubWriter(val allOperations: Seq[Operation]) {
 class SyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allOperations) {
 
 	override def filterOps(allOperations:Seq[Operation]) : Seq[Operation] = {
-		val toSkip = Set("login", "describeSObject", "create", "update", "describeGlobal", "search")
+		val toSkip = Set("login", "create", "update", "search") // , "describeGlobal", "describeSObject" )
 		allOperations.filter(x => !toSkip.contains(x.name))
 	}
 
@@ -721,7 +742,9 @@ class SyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allOp
 		for (t <- rts)
 			w.printClassForwardDecl(t)
 		w.println()
+		w.println("\\ All methods in this category are deprecated, please migrate to the async equivalent")
 		w.println("@interface ZKSforceClient (Operations)")
+		w.println()
 		for (op <- operations)
 			op.writeMethodDecl(w)
 		w.println("@end")
@@ -736,6 +759,7 @@ class SyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allOp
 		w.printImports(referencedTypes)
 		w.println()
 		w.println("@implementation ZKSforceClient (Operations)")
+		w.println()
 		for (op <- operations)
 			op.writeMethodImpl(w)
 		w.println("@end")
@@ -748,9 +772,9 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 	override def writeHeader() {
 		val w = new SourceWriter(new File(new File("output"), "ZKSforceClient+zkAsyncQuery.h"))
 		w.printLicenseComment()
-		w.printImport("ZKSforceClient+Operations.h")
+		w.printImport("ZKSforceBaseClient.h")
 		w.println()
-		w.println("@interface ZKSforceClient (zkAsyncQuery)")
+		w.println("@interface ZKSforceBaseClient (zkAsyncQuery)")
 		w.println()
 		val pad = returnTypes.map(_.blockTypeName.length).max
 		for (rt <- returnTypes.filter(_.objcName != "void"))
@@ -778,7 +802,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 		w.printLicenseComment()
 		w.printImport("ZKSforceClient+zkAsyncQuery.h")
 		w.println()
-		w.println(s"""@implementation ZKSforceClient (zkAsyncQuery)
+		w.println(s"""@implementation ZKSforceBaseClient (zkAsyncQuery)
 				|
 				|-(BOOL)confirmLoggedIn {
 				|	if (!self.loggedIn) {
@@ -802,22 +826,41 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				|""".stripMargin('|'))
 		for (op <- operations) {
 			val completeBlock = if (op.returnType.objcName == "void") "completeBlock()" else s"completeBlock(result)"
-			val makeResult = if (op.returnType.objcName == "void") "" else s"${op.returnType.fullTypeName} result = [self ${op.makeResultMethodName}:root];"
+			val makeResult = if (op.returnType.objcName == "void") "" else {
+				if (op.requiresPrePostCallHooks()) {
+					s"${op.returnType.fullTypeName}result = [self postHook_${op.name}:[self ${op.makeResultMethodName}:root]];"
+				} else {
+					s"${op.returnType.fullTypeName}result = [self ${op.makeResultMethodName}:root];"
+				}
+			}
 			val checkSession = if (op.inputHeaders.map(_.elementName).contains("SessionHeader")) "YES" else "NO"
+			if (op.requiresPrePostCallHooks) {
+				w.println(s"-(${op.returnType.fullTypeName})preHook_${op.name}${op.paramList} { return nil; }")
+				w.println(s"-(${op.returnType.fullTypeName})postHook_${op.name}:(${op.returnType.fullTypeName})r { return r; }")
+				w.println()
+			}
 			w.println(op.blockMethodSignature + " {")
-			w.println(s"""
-						|	NSString *payload = [self ${op.makeEnvMethodName}${op.callSyncParamList}];
-						|	[self startRequest:payload name:@"${op.name}" handler:^(zkElement *root, NSException *ex) {
-        				|		if (![self handledError:ex failBlock:failBlock]) {
-            			|			${makeResult}
-            			|			dispatch_async(dispatch_get_main_queue(), ^{
-                		|				${completeBlock};
-            			|			});
-        				|		}
-						|	}];
-						|}
-						|""".stripMargin('|'))
-
+			w.println()
+			if (op.requiresPrePostCallHooks()) {
+				w.println(s"""|	${op.returnType.fullTypeName}shortcut = [self preHook_${op.name}${op.callSyncParamList}];
+								|	if (shortcut != nil) {
+								|		dispatch_async(dispatch_get_main_queue(), ^{
+								|				completeBlock(shortcut);
+								|		});
+								|		return;
+								|	}""".stripMargin('|'))
+			}
+			w.println(s"""|	NSString *payload = [self ${op.makeEnvMethodName}${op.callSyncParamList}];
+							|	[self startRequest:payload name:@"${op.name}" handler:^(zkElement *root, NSException *ex) {
+							|		if (![self handledError:ex failBlock:failBlock]) {
+							|			${makeResult}
+							|			dispatch_async(dispatch_get_main_queue(), ^{
+							|				${completeBlock};
+							|			});
+							|		}
+							|	}];
+							|}
+							|""".stripMargin('|'))
 		}
 		w.println("@end");
 		w.close()
