@@ -768,6 +768,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 		val w = new SourceWriter(new File(new File("output/generated"), "ZKSforceBaseClient+Operations.m"))
 		w.printLicenseComment()
 		w.printImport("ZKSforceBaseClient+Operations.h")
+		w.printImport("ZKErrors.h")
 		w.println()
 		w.println(s"""@implementation ZKSforceBaseClient (AsyncOperations)
 				|
@@ -775,7 +776,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				|	return YES; // concrete impl in subclass
 				|}
 				|
-				|-(BOOL)handledError:(NSException *)ex failBlock:(zkFailWithExceptionBlock)failBlock {
+				|-(BOOL)handledError:(NSError *)ex failBlock:(ZKFailWithErrorBlock)failBlock {
     			|	if (ex == nil) {
         		|		return NO;
     			|	}
@@ -806,8 +807,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 			val checkSession = op.inputHeaders.map(_.elementName).contains("SessionHeader")
 			if (checkSession) {
 				w.println(s"""|	if (![self confirmLoggedIn]) {
-							  |		[self handledError:[NSException exceptionWithName:@"Unauthorized" reason:@"This method requires authentication, which hasn't been performed yet." userInfo:nil]
-							  |				failBlock:failBlock];
+							  |		[self handledError:[ZKErrors authenticationRequiredError] failBlock:failBlock];
 							  |		return;
 							  |	}""".stripMargin('|'))
 			}
@@ -821,8 +821,8 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 								|	}""".stripMargin('|'))
 			}
 			w.println(s"""|	NSString *payload = [self ${op.makeEnvMethodName}${op.callSyncParamList}];
-							|	[self startRequest:payload name:@"${op.name}" handler:^(zkElement *root, NSException *ex) {
-							|		if (![self handledError:ex failBlock:failBlock]) {
+							|	[self startRequest:payload name:@"${op.name}" handler:^(zkElement *root, NSError *err) {
+							|		if (![self handledError:err failBlock:failBlock]) {
 							|			${makeResult}
 							|			dispatch_async(dispatch_get_main_queue(), ^{
 							|				${completeBlock};
@@ -878,6 +878,7 @@ class BaseClientWriter(allOperations: Seq[Operation], headers: Seq[ComplexTypePr
 		w.printImport("ZKParser.h")
 		w.printImport("ZKPartnerEnvelope.h")
 		w.printImport("ZKAuthenticationInfo.h")
+		w.printImport("ZKConstants.h")
 		w.printImports(referencedTypes)
 		w.println()
 		w.println("@implementation ZKSforceBaseClient")
@@ -1005,7 +1006,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
     def writeZKSforceh() {
 		val w = new SourceWriter(new File(new File("output"), "ZKSforce.h"))
 		w.printLicenseComment()
-		val fixedImports = List("ZKSforceClient.h", "ZKSObject.h", "ZKSoapException.h", "ZKLimitInfoHeader.h", "ZKLimitInfo.h")
+		val fixedImports = List("ZKSforceClient.h", "ZKSforceBaseClient+Operations.h", "ZKSObject.h", "ZKLimitInfoHeader.h", "ZKLimitInfo.h")
 		for (i <- fixedImports)
 			w.printImport(i)
 		w.printImports(complexTypes.values)
