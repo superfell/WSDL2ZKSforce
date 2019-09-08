@@ -30,6 +30,18 @@ import java.io._
 // Helper class for generating a new source code file.
 class SourceWriter(val file: File) {
 	val w = new PrintWriter(file)
+	var numIndent = 0
+	var indentStr = ""
+
+	def indent() {
+		numIndent += 1
+		indentStr = "\t" * numIndent
+	}
+
+	def outdent() {
+		numIndent -= 1
+		indentStr = "\t" * numIndent
+	}
 
 	def close() {
 		w.close()
@@ -40,7 +52,7 @@ class SourceWriter(val file: File) {
 	}
 	
 	def println(s: String) {
-		w.println(s)
+		s.split("\n").map(indentStr + _).foreach(w.println)
 	}
 	
 	// for the collection of types, adds any import statements that would be needed.
@@ -58,15 +70,15 @@ class SourceWriter(val file: File) {
 	}
 	
 	def printImport(f: String) {
-		w.println(s"""#import "$f"""")
+		println(s"""#import "$f"""")
 	}
 	
 	def printClassForwardDecl(c: String) {
-		w.println(s"@class $c;")
+		println(s"@class $c;")
 	}
 	
 	def printProtocolForwardDecl(p: String) {
-		w.println(s"@protocol $p;")
+		println(s"@protocol $p;")
 	}
 
 	// reads the first line of the copyright from the current matching source file in the zkSforce tree, if it exists.
@@ -569,34 +581,6 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 		s"-(${returnType.fullTypeName})$name${paramList}"
 	}
 	
-	def writeMethodDecl(w: SourceWriter) {
-		w.println(s"""/** $description */
-					|$objcSignature DEPRECATED_MSG_ATTRIBUTE("Please use perform${name.capitalize} instead");
-					|""".stripMargin('|'))
-	}
-	
-	def writeMethodImpl(w: SourceWriter) {
-		val nullValue = if (returnType.objcName == "void") "" else "nil"
-		w.println(s"""/** $description */
-					|$objcSignature {
-					|	if (!self.authSource) return $nullValue;
-					|	[self checkSession];""".stripMargin('|'))
-		preCallSyncHook(w)
-		w.println(s"""	NSString *payload = [self ${makeEnvMethodName}${callSyncParamList}];""")
-
-		if (returnType.objcName == "void") {
-			w.println("""|	[self sendRequest:payload name:NSStringFromSelector(_cmd) returnRoot:YES];
-						 |}""".stripMargin('|'))
-		} else {
-			w.println(s"""|	ZKElement *root = [self sendRequest:payload name:NSStringFromSelector(_cmd) returnRoot:YES];
-	  					  |	${returnType.fullTypeName}result = [self ${makeResultMethodName}:root];""".stripMargin('|'))
-			postCallSyncHook(w)
-			w.println(s"""|	return result;
-						  |}
-						  |""".stripMargin('|'))
-		}
-	}
-	
 	def preCallSyncHook(w: SourceWriter) {
 		if (requiresPrePostCallHooks()) {
 			w.println(s"""|	${returnType.fullTypeName}shortcut = [self preHook_${name}${callSyncParamList}];
@@ -674,16 +658,18 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 	}
 
 	def blockMethodSignature():String = {
-		val cp = name.length + 15
+		val cp = name.length
 		if (params.length == 0)
-			s"""/** ${description} */
-				|-(void) perform${name.capitalize}WithFailBlock:(ZKFailWithErrorBlock)failBlock
-				|${" ".padTo(cp-13,' ')}completeBlock:(${returnType.blockTypeName})completeBlock""".stripMargin('|')
+			s"""/** ${description}
+				|    Callbacks will be executed on the main queue. */
+				|-(void) ${name}WithFailBlock:(ZKFailWithErrorBlock)failBlock
+				|${" ".padTo(cp+8,' ')}completeBlock:(${returnType.blockTypeName})completeBlock""".stripMargin('|')
 		else
-			s"""/** ${description} */
-				|-(void) perform${name.capitalize}${paramList}
-				|${" ".padTo(cp-9,' ')}failBlock:(ZKFailWithErrorBlock)failBlock
-				|${" ".padTo(cp-13,' ')}completeBlock:(${returnType.blockTypeName})completeBlock""".stripMargin('|')
+			s"""/** ${description}
+				|    Callbacks will be executed on the main queue. */
+				|-(void) ${name}${paramList}
+				|${" ".padTo(cp+8-9,' ')}failBlock:(ZKFailWithErrorBlock)failBlock
+				|${" ".padTo(cp+8-13,' ')}completeBlock:(${returnType.blockTypeName})completeBlock""".stripMargin('|')
 	}
 }
 
@@ -756,6 +742,9 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 		w.println()
 		w.println("@interface ZKSforceBaseClient (AsyncOperations)")
 		w.println();
+		w.println("/** @return true if we've performed a login request and it succeeded. */")
+		w.println("@property (readonly) BOOL loggedIn;")
+		w.println()
 		for (op <- operations) {
 			w.println(op.blockMethodSignature +";")
 			w.println()
@@ -768,23 +757,35 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 		val w = new SourceWriter(new File(new File("output/generated"), "ZKSforceBaseClient+Operations.m"))
 		w.printLicenseComment()
 		w.printImport("ZKSforceBaseClient+Operations.h")
+		w.printImport("ZKAuthenticationInfo.h")
 		w.printImport("ZKErrors.h")
 		w.println()
 		w.println(s"""@implementation ZKSforceBaseClient (AsyncOperations)
 				|
-				|-(BOOL)confirmLoggedIn {
-				|	return YES; // concrete impl in subclass
+				|-(BOOL)loggedIn {
+    			|	return self.authSource.sessionId.length > 0;
+				|}
+				|
+				|-(void)execWithSession:(void(^)(NSError *sessionError))cb {
+				|	if (![self loggedIn]) {
+				|		cb([ZKErrors authenticationRequiredError]);
+				|		return;
+				|	}
+    			|	[self.authSource refreshIfNeeded:^(BOOL refreshed, NSError *ex) {
+        		|		if (refreshed) {
+            	|			self.endpointUrl = self.authSource.instanceUrl;
+        		|		}
+        		|		cb(ex);
+    			|	}];
 				|}
 				|
 				|-(BOOL)handledError:(NSError *)ex failBlock:(ZKFailWithErrorBlock)failBlock {
     			|	if (ex == nil) {
         		|		return NO;
     			|	}
-    			|	if (failBlock != nil) {
-        		|		dispatch_async(dispatch_get_main_queue(), ^{
-            	|			failBlock(ex);
-        		|		});
-    			|	}
+        		|	dispatch_async(dispatch_get_main_queue(), ^{
+            	|		failBlock(ex);
+        		|	});
     			|	return YES;
 				|}
 				|""".stripMargin('|'))
@@ -806,10 +807,11 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 			w.println()
 			val checkSession = op.inputHeaders.map(_.elementName).contains("SessionHeader")
 			if (checkSession) {
-				w.println(s"""|	if (![self confirmLoggedIn]) {
-							  |		[self handledError:[ZKErrors authenticationRequiredError] failBlock:failBlock];
-							  |		return;
-							  |	}""".stripMargin('|'))
+				w.println(s"""|	[self execWithSession:^(NSError *err) {
+							  |		if ([self handledError:err failBlock:failBlock]) {
+							  |			return;
+							  |		}""".stripMargin('|'))
+				w.indent()
 			}
 			if (op.requiresPrePostCallHooks()) {
 				w.println(s"""|	${op.returnType.fullTypeName}shortcut = [self preHook_${op.name}${op.callSyncParamList}];
@@ -828,9 +830,13 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 							|				${completeBlock};
 							|			});
 							|		}
-							|	}];
-							|}
-							|""".stripMargin('|'))
+							|	}];""".stripMargin('|'))
+			if (checkSession) {
+				w.println("}];")
+				w.outdent()
+			}
+			w.println("}")
+			w.println()
 		}
 		w.println("@end");
 		w.close()
