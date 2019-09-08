@@ -567,7 +567,6 @@ class VoidTypeInfo() extends TypeInfo("void", "void", "", false) {
 class Operation(val name: String, val description: String, val params: Seq[ComplexTypeProperty], val returnType:TypeInfo, val inputHeaders: Seq[ComplexTypeProperty] ) {
 	
 	def requiresPrePostCallHooks(): Boolean = {
-		println(name)
 		name == "describeGlobal" || name == "describeSObject"	
 	}
 
@@ -742,7 +741,7 @@ class SyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allOp
 		for (t <- rts)
 			w.printClassForwardDecl(t)
 		w.println()
-		w.println("\\ All methods in this category are deprecated, please migrate to the async equivalent")
+		w.println("/** All methods in this category are deprecated, please migrate to the async equivalent */")
 		w.println("@interface ZKSforceClient (Operations)")
 		w.println()
 		for (op <- operations)
@@ -805,11 +804,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 		w.println(s"""@implementation ZKSforceBaseClient (zkAsyncQuery)
 				|
 				|-(BOOL)confirmLoggedIn {
-				|	if (!self.loggedIn) {
-				|		NSLog(@"ZKSforceClient does not have a valid session. request not executed");
-				|		return NO;
-				|	}
-				|	return YES;
+				|	return YES; // concrete impl in subclass
 				|}
 				|
 				|-(BOOL)handledError:(NSException *)ex failBlock:(zkFailWithExceptionBlock)failBlock {
@@ -833,7 +828,6 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 					s"${op.returnType.fullTypeName}result = [self ${op.makeResultMethodName}:root];"
 				}
 			}
-			val checkSession = if (op.inputHeaders.map(_.elementName).contains("SessionHeader")) "YES" else "NO"
 			if (op.requiresPrePostCallHooks) {
 				w.println(s"-(${op.returnType.fullTypeName})preHook_${op.name}${op.paramList} { return nil; }")
 				w.println(s"-(${op.returnType.fullTypeName})postHook_${op.name}:(${op.returnType.fullTypeName})r { return r; }")
@@ -841,6 +835,14 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 			}
 			w.println(op.blockMethodSignature + " {")
 			w.println()
+			val checkSession = op.inputHeaders.map(_.elementName).contains("SessionHeader")
+			if (checkSession) {
+				w.println(s"""|	if (![self confirmLoggedIn]) {
+							  |		[self handledError:[NSException exceptionWithName:@"Unauthorized" reason:@"This method requires authentication, which hasn't been performed yet." userInfo:nil]
+							  |				failBlock:failBlock];
+							  |		return;
+							  |	}""".stripMargin('|'))
+			}
 			if (op.requiresPrePostCallHooks()) {
 				w.println(s"""|	${op.returnType.fullTypeName}shortcut = [self preHook_${op.name}${op.callSyncParamList}];
 								|	if (shortcut != nil) {
