@@ -422,13 +422,13 @@ class OutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Node, fi
 	override protected def writeImplFileBody(w: SourceWriter) {
 		if (implementNSCopying) {
 			w.println(s"""-(id)copyWithZone:(NSZone *)zone {
-				|    zkElement *e = [node copyWithZone:zone];
+				|    ZKElement *e = [node copyWithZone:zone];
 				|    $objcName *c = [[$objcName alloc] initWithXmlElement:e];
 				|    ${additionalNSCopyImpl}
 				|    return c;
 				|}
 				|
-				|-(zkElement *)node {
+				|-(ZKElement *)node {
 				|	return node;
 				|}
 				|
@@ -461,7 +461,7 @@ class InputOutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Nod
     override protected def writeHeaderProperties(w: SourceWriter) {
         w.println("-(instancetype)init NS_DESIGNATED_INITIALIZER;")
         w.println("-(instancetype)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d NS_DESIGNATED_INITIALIZER;");
-        w.println("-(instancetype)initWithXmlElement:(zkElement *)e;")
+        w.println("-(instancetype)initWithXmlElement:(ZKElement *)e;")
         w.println();
         super.writeHeaderProperties(w);
     }
@@ -483,7 +483,7 @@ class InputOutputComplexTypeInfo(xmlName: String, objcName: String, xmlNode: Nod
         w.println("    return self;")
         w.println("}")
         w.println()
-        w.println("-(instancetype)initWithXmlElement:(zkElement *)e {")
+        w.println("-(instancetype)initWithXmlElement:(ZKElement *)e {")
         w.println("    ZKXmlDeserializer *d = [[ZKXmlDeserializer alloc] initWithXmlElement:e];")
         w.println("    return [self initWithZKXmlDeserializer:d];")
         w.println("}")
@@ -588,7 +588,7 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 			w.println("""|	[self sendRequest:payload name:NSStringFromSelector(_cmd) returnRoot:YES];
 						 |}""".stripMargin('|'))
 		} else {
-			w.println(s"""|	zkElement *root = [self sendRequest:payload name:NSStringFromSelector(_cmd) returnRoot:YES];
+			w.println(s"""|	ZKElement *root = [self sendRequest:payload name:NSStringFromSelector(_cmd) returnRoot:YES];
 	  					  |	${returnType.fullTypeName}result = [self ${makeResultMethodName}:root];""".stripMargin('|'))
 			postCallSyncHook(w)
 			w.println(s"""|	return result;
@@ -626,7 +626,7 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 		w.println(makeResultMethodSignature() + " {")
 		val retStmt = returnType.accessor("deser", "result")
 		if (retStmt != "") {
-			w.println(s"""|	zkElement *body = [root childElement:@"Body" ns:NS_SOAP_ENV];
+			w.println(s"""|	ZKElement *body = [root childElement:@"Body" ns:NS_SOAP_ENV];
 				|	ZKXmlDeserializer *deser = [[ZKXmlDeserializer alloc] initWithXmlElement:body.childElements[0]];
 				|	return $retStmt;""".stripMargin('|'))
 		} else if (returnType.objcName != "void") {
@@ -670,7 +670,7 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 	}
 
 	def makeResultMethodSignature():String = {
-		s"""-(${returnType.fullTypeName})${makeResultMethodName}:(zkElement *)root"""
+		s"""-(${returnType.fullTypeName})${makeResultMethodName}:(ZKElement *)root"""
 	}
 
 	def blockMethodSignature():String = {
@@ -821,7 +821,7 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 								|	}""".stripMargin('|'))
 			}
 			w.println(s"""|	NSString *payload = [self ${op.makeEnvMethodName}${op.callSyncParamList}];
-							|	[self startRequest:payload name:@"${op.name}" handler:^(zkElement *root, NSError *err) {
+							|	[self startRequest:payload name:@"${op.name}" handler:^(ZKElement *root, NSError *err) {
 							|		if (![self handledError:err failBlock:failBlock]) {
 							|			${makeResult}
 							|			dispatch_async(dispatch_get_main_queue(), ^{
@@ -846,7 +846,7 @@ class BaseClientWriter(allOperations: Seq[Operation], headers: Seq[ComplexTypePr
 		w.printImport("ZKBaseClient.h")
 		w.println()
 		w.printProtocolForwardDecl("ZKAuthenticationInfo")
-		w.printClassForwardDecl("zkElement")
+		w.printClassForwardDecl("ZKElement")
 		for (h <- headers)
 			w.printClassForwardDecl(h.propType.objcName)
 		val rts = collection.immutable.TreeSet.empty[String] ++ referencedTypes.filter(_.isGeneratedType).map(_.objcName)
