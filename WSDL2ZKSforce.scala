@@ -807,8 +807,8 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 			w.println()
 			val checkSession = op.inputHeaders.map(_.elementName).contains("SessionHeader")
 			if (checkSession) {
-				w.println(s"""|	[self execWithSession:^(NSError *err) {
-							  |		if ([self handledError:err failBlock:failBlock]) {
+				w.println(s"""|	[self execWithSession:^(NSError *sessionErr) {
+							  |		if ([self handledError:sessionErr failBlock:failBlock]) {
 							  |			return;
 							  |		}""".stripMargin('|'))
 				w.indent()
@@ -1012,7 +1012,7 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
     def writeZKSforceh() {
 		val w = new SourceWriter(new File(new File("output"), "ZKSforce.h"))
 		w.printLicenseComment()
-		val fixedImports = List("ZKSforceClient.h", "ZKSforceBaseClient+Operations.h", "ZKSObject.h", "ZKLimitInfoHeader.h", "ZKLimitInfo.h")
+		val fixedImports = List("ZKSforceClient.h", "ZKSforceBaseClient+Operations.h", "ZKSObject.h", "ZKLimitInfoHeader.h", "ZKLimitInfo.h", "ZKConstants.h")
 		for (i <- fixedImports)
 			w.printImport(i)
 		w.printImports(complexTypes.values)
