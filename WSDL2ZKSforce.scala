@@ -657,6 +657,23 @@ class Operation(val name: String, val description: String, val params: Seq[Compl
 		s"""-(${returnType.fullTypeName})${makeResultMethodName}:(ZKElement *)root"""
 	}
 
+	def fullBlockMethodSignature():String = {
+		val cp = name.length
+		if (params.length == 0)
+			s"""/** ${description}
+				|    Callbacks with be executed on the supplied queue. */
+				|-(void) ${name}WithQueue:(dispatch_queue_t)callbackQueue 
+				|${" ".padTo(cp+8,' ')}failBlock:(ZKFailWithErrorBlock)failBlock
+				|${" ".padTo(cp+4,' ')}completeBlock:(${returnType.blockTypeName})completeBlock""".stripMargin('|')
+		else
+			s"""/** ${description}
+				|    Callbacks with be executed on the supplied queue. */
+				|-(void) ${name}${paramList}
+				|${" ".padTo(cp+8-5,' ')}queue:(dispatch_queue_t)callbackQueue
+				|${" ".padTo(cp+8-9,' ')}failBlock:(ZKFailWithErrorBlock)failBlock
+				|${" ".padTo(cp+8-13,' ')}completeBlock:(${returnType.blockTypeName})completeBlock""".stripMargin('|')
+	}
+
 	def blockMethodSignature():String = {
 		val cp = name.length
 		if (params.length == 0)
@@ -748,6 +765,9 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 		for (op <- operations) {
 			w.println(op.blockMethodSignature +";")
 			w.println()
+			w.println(op.fullBlockMethodSignature+";")
+			w.println()
+			w.println()
 		}
 		w.println("@end")
 		w.close()
@@ -779,15 +799,14 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
     			|	}];
 				|}
 				|
-				|-(BOOL)handledError:(NSError *)ex failBlock:(ZKFailWithErrorBlock)failBlock {
+				|-(BOOL)handledError:(NSError *)ex queue:(dispatch_queue_t)queue failBlock:(ZKFailWithErrorBlock)failBlock {
     			|	if (ex == nil) {
         		|		return NO;
     			|	}
-        		|	dispatch_async(dispatch_get_main_queue(), ^{
-            	|		failBlock(ex);
-        		|	});
+        		|	dispatch_async(queue, ^{ failBlock(ex); });
     			|	return YES;
 				|}
+				|
 				|""".stripMargin('|'))
 		for (op <- operations) {
 			val completeBlock = if (op.returnType.objcName == "void") "completeBlock()" else s"completeBlock(result)"
@@ -803,12 +822,29 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 				w.println(s"-(${op.returnType.fullTypeName})postHook_${op.name}:(${op.returnType.fullTypeName})r { return r; }")
 				w.println()
 			}
-			w.println(op.blockMethodSignature + " {")
+			if (op.params.isEmpty) {
+				w.println(s"""${op.blockMethodSignature} {
+							|	[self ${op.name}WithQueue:dispatch_get_main_queue()
+							|           failBlock:failBlock 
+							|       completeBlock:completeBlock];
+							|}
+							|""".stripMargin('|'))
+			} else {
+				w.println(s"""${op.blockMethodSignature} {
+							|	[self ${op.name}${op.callSyncParamList}
+							|               queue:dispatch_get_main_queue() 
+							|           failBlock:failBlock 
+							|       completeBlock:completeBlock];
+							|}
+							|""".stripMargin('|'))
+			}
+
+			w.println(op.fullBlockMethodSignature + " {")
 			w.println()
 			val checkSession = op.inputHeaders.map(_.elementName).contains("SessionHeader")
 			if (checkSession) {
 				w.println(s"""|	[self execWithSession:^(NSError *sessionErr) {
-							  |		if ([self handledError:sessionErr failBlock:failBlock]) {
+							  |		if ([self handledError:sessionErr queue:callbackQueue failBlock:failBlock]) {
 							  |			return;
 							  |		}""".stripMargin('|'))
 				w.indent()
@@ -816,19 +852,15 @@ class ASyncStubWriter(allOperations: Seq[Operation]) extends BaseStubWriter(allO
 			if (op.requiresPrePostCallHooks()) {
 				w.println(s"""|	${op.returnType.fullTypeName}shortcut = [self preHook_${op.name}${op.callSyncParamList}];
 								|	if (shortcut != nil) {
-								|		dispatch_async(dispatch_get_main_queue(), ^{
-								|				completeBlock(shortcut);
-								|		});
+								|		dispatch_async(callbackQueue, ^{ completeBlock(shortcut); });
 								|		return;
 								|	}""".stripMargin('|'))
 			}
 			w.println(s"""|	NSString *payload = [self ${op.makeEnvMethodName}${op.callSyncParamList}];
 							|	[self startRequest:payload name:@"${op.name}" handler:^(ZKElement *root, NSError *err) {
-							|		if (![self handledError:err failBlock:failBlock]) {
+							|		if (![self handledError:err queue:callbackQueue failBlock:failBlock]) {
 							|			${makeResult}
-							|			dispatch_async(dispatch_get_main_queue(), ^{
-							|				${completeBlock};
-							|			});
+							|			dispatch_async(callbackQueue, ^{ ${completeBlock}; });
 							|		}
 							|	}];""".stripMargin('|'))
 			if (checkSession) {
