@@ -402,8 +402,14 @@ class ComplexTypeInfo(
   }
 
   protected def writeForwardDecls(w: SourceWriter) {
-    for (f <- fields.filter(_.propType.isGeneratedType))
-      w.printClassForwardDecl(f.propType.objcName)
+    for (
+      t <- fields
+        .filter(_.propType.isGeneratedType)
+        .map(f => f.propType)
+        .distinct
+    ) {
+      w.printClassForwardDecl(t.objcName)
+    }
   }
 
   private def padMembersTo(includeFlags: Boolean): Int = {
