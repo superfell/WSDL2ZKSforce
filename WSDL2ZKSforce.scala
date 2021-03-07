@@ -131,14 +131,13 @@ class SourceWriter(val file: File) {
   def writeFieldSerializers(
       instName: String,
       valueScope: String,
-      w: SourceWriter,
       fields: collection.Seq[ComplexTypeProperty]
   ) {
     if (fields.length == 0) return;
     val padTo = fields.map(_.serializerLength).max
     val padNamesTo = fields.map(_.elementName.length).max
     for (f <- fields)
-      w.println(f.serializerMethod(instName, padTo, padNamesTo, valueScope))
+      println(f.serializerMethod(instName, padTo, padNamesTo, valueScope))
   }
 }
 
@@ -488,7 +487,7 @@ class InputComplexTypeInfo(
     val fieldsToSerialize =
       if (baseType == null) fields
       else (baseType.asInstanceOf[ComplexTypeInfo].fields) ++ fields
-    w.writeFieldSerializers("env", "self", w, fieldsToSerialize)
+    w.writeFieldSerializers("env", "self", fieldsToSerialize)
     w.println("\t[env endElement:elemName];")
     w.println("}")
   }
@@ -723,12 +722,11 @@ class Operation(
     w.writeFieldSerializers(
       "env",
       "self",
-      w,
       inputHeaders.filter(_.elementName != "SessionHeader")
     )
     w.println(s"""|	[env moveToBody];
 				      |	[env startElement:@"${name}"];""".stripMargin('|'))
-    w.writeFieldSerializers("env", "", w, params)
+    w.writeFieldSerializers("env", "", params)
     w.println(s"""|	[env endElement:@"${name}"];
 					  |	return env.end;
 					  |}""".stripMargin('|'))
