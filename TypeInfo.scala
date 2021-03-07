@@ -381,6 +381,11 @@ class OutputComplexTypeInfo(
   protected def additionalNSCopyImpl(): String = { "" }
 
   override protected def writeImplFileBody(w: SourceWriter) {
+    w.println(s"""+(void)load {
+                |   [self registerType:self xmlName:@"$xmlName"];
+                |}
+                |
+      """.stripMargin('|'))
     if (implementNSCopying) {
       w.println(s"""-(id)copyWithZone:(NSZone *)zone {
 				|    ZKElement *e = [node copyWithZone:zone];
@@ -437,30 +442,32 @@ class InputOutputComplexTypeInfo(
   }
 
   override protected def writeExtraImpl(w: SourceWriter) {
-    w.println()
-    w.println("-(instancetype)init {")
-    w.println("    self = [super init];")
-    w.println("    return self;")
-    w.println("}")
-    w.println()
-    w.println(
-      "-(instancetype)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d {"
-    )
-    if (baseType == null)
-      w.println("    self = [super init];")
-    else
-      w.println("    self = [super initWithZKXmlDeserializer:d];")
-    for (f <- fields)
+    val init = if (baseType == null) "init" else "initWithZKXmlDeserializer:d"
+    w.println(s"""
+            |+(void)load {
+            |    [self registerType:self xmlName:@"$xmlName"];
+            |}
+            |
+            |-(instancetype)init {
+            |    self = [super init];
+            |    return self;
+            |}
+            |
+            |-(instancetype)initWithZKXmlDeserializer:(ZKXmlDeserializer *)d {
+            |    self = [super $init];
+            |""".stripMargin('|'))
+
+    for (f <- fields) {
       w.println(f.initializer("d"));
-    w.println("    return self;")
-    w.println("}")
-    w.println()
-    w.println("-(instancetype)initWithXmlElement:(ZKElement *)e {")
-    w.println(
-      "    ZKXmlDeserializer *d = [[ZKXmlDeserializer alloc] initWithXmlElement:e];"
-    )
-    w.println("    return [self initWithZKXmlDeserializer:d];")
-    w.println("}")
+    }
+    w.println(s"""|    return self;
+                |}
+                |
+                |-(instancetype)initWithXmlElement:(ZKElement *)e {
+                |    ZKXmlDeserializer *d = [[ZKXmlDeserializer alloc] initWithXmlElement:e];
+                |    return [self initWithZKXmlDeserializer:d];
+                |}
+                |""".stripMargin('|'))
   }
 }
 
