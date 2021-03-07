@@ -1,0 +1,27 @@
+{
+    "files.watcherExclude": {
+        "**/target": true
+    },
+    "cSpell.words": [
+        "Objc",
+        "Serializers",
+        "Sforce",
+        "ZKXML",
+        "alloc",
+        "autoreleased",
+        "deser",
+        "hfile",
+        "ifile",
+        "instancetype",
+        "ivar",
+        "nillable",
+        "nscopying",
+        "outdent",
+        "prevalidate",
+        "qname",
+        "readonly",
+        "sobject",
+        "soql",
+        "xmlt"
+    ]
+}
