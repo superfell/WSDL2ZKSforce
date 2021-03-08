@@ -339,7 +339,7 @@ class InputComplexTypeInfo(
     writeExtraImpl(w)
     w.println()
     w.println(
-      "-(void)serializeToEnvelope:(ZKEnvelope *)env elemName:(NSString *)elemName {"
+      "-(void)serializeTo:(ZKXmlWriter *)env elemName:(NSString *)elemName {"
     )
     // if there's a baseType, then this is an extension type, and we need to serialize our type out as an xsi:type attribute
     if (baseType == null)
