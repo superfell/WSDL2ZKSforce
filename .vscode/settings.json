@@ -3,6 +3,7 @@
         "**/target": true
     },
     "cSpell.words": [
+        "Impls",
         "Objc",
         "Serializers",
         "Sforce",
@@ -15,9 +16,12 @@
         "instancetype",
         "ivar",
         "nillable",
+        "nonatomic",
         "nscopying",
         "outdent",
         "prevalidate",
+        "proto",
+        "protos",
         "qname",
         "readonly",
         "sobject",

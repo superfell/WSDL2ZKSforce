@@ -356,9 +356,9 @@ class BaseClientWriter(
     w.println("@property (strong) NSObject<ZKAuthenticationInfo> *authSource;")
     w.println()
     val padTo =
-      headers.map(_.propType.propertyLengthForPaddingCalc(false)).max + 1
+      headers.map(_.propType.propertyLengthForPaddingCalc()).max + 1
     for (h <- headers) {
-      w.println(h.propertyDecl(padTo, false))
+      w.println(h.propertyDecl(padTo))
     }
     w.println()
     for (op <- operations) {
