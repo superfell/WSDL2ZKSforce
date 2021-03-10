@@ -83,6 +83,7 @@ class ComplexTypeInfo(
 
   protected def writeHeaderImports(w: SourceWriter) {
     w.printImport(headerImportFile)
+    w.printImport("ZKComplexTypeFieldInfo.h")
     w.printImport("ZKXmlDeserializer.h")
     w.printImport("ZKParser.h")
   }
@@ -114,6 +115,7 @@ class ComplexTypeInfo(
     // w.println(
     //   "-(instancetype)initWithXmlElement:(ZKElement *)e NS_DESIGNATED_INITIALIZER;"
     // )
+    w.println("+(ZKComplexTypeInfo *)wsdlSchema;")
     w.println();
     val padTo = padMembersTo()
     fields.foreach(f => w.println(f.propertyDecl(padTo)))
@@ -152,6 +154,7 @@ class ComplexTypeInfo(
 
   protected def writeImplFileBody(w: SourceWriter) {
     writeRegistration(w)
+    writeWsdlSchema(w)
     writePropertyImpls(w)
     writeSerializeTo(w)
   }
@@ -179,6 +182,33 @@ class ComplexTypeInfo(
             |    [self registerType:self xmlName:@"$xmlName"];
             |}
             |""".stripMargin('|'))
+  }
+
+  protected def writeWsdlSchema(w: SourceWriter) {
+    w.println(s"""
+    |+(ZKComplexTypeInfo *)wsdlSchema {
+    |   static ZKComplexTypeInfo *wsdlSchema;
+    |   static dispatch_once_t onceToken;
+    |   dispatch_once(&onceToken, ^{
+    |       wsdlSchema = [[ZKComplexTypeInfo alloc] initWithType:@"$xmlName" parent:${if (
+      baseType == null
+    ) "nil"
+    else "[" + baseType.objcName + " class]"}
+    |                    fields:@[""".stripMargin('|'))
+    for (f <- fields) {
+      w.println(
+        s"""                        [[ZKComplexTypeFieldInfo alloc] initWithElementName:@"${f.elementName}" propertyName:@"${f.propertyName}" optional:${if (
+          f.optional
+        ) "YES"
+        else "NO"} nillable:${if (f.nillable) "YES" else "NO"}],"""
+      )
+    }
+    w.println(s"""
+    |                    ]];
+    |   });
+    |   return wsdlSchema;
+    |}
+    """.stripMargin('|'))
   }
 
   protected def writePropertyImpls(w: SourceWriter) {
