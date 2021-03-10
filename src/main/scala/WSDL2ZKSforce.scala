@@ -390,10 +390,9 @@ class Schema(wsdl: Elem, typeMapping: Map[String, TypeInfo]) {
     if (objcName == "ZKDescribeField")
       new ZKDescribeField(xmlName, objcName, ct, fields)
     else if (objcName == "ZKDescribeSObject") {
-      val dg =
-        complexType("DescribeGlobalSObjectResult");
+      val dg = complexType("DescribeGlobalSObjectResult");
       val childFields = fields.filter(!dg.fields.contains(_))
-      new ZKDescribeSObject(xmlName, objcName, ct, childFields)
+      new ZKDescribeSObject(xmlName, objcName, ct, childFields, dg)
     } else {
       new ComplexTypeInfo(xmlName, objcName, ct, fields, baseType)
     }

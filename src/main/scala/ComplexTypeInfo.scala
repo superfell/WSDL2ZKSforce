@@ -111,10 +111,6 @@ class ComplexTypeInfo(
   }
 
   protected def writeHeaderProperties(w: SourceWriter) {
-    // w.println("-(instancetype)init NS_DESIGNATED_INITIALIZER;")
-    // w.println(
-    //   "-(instancetype)initWithXmlElement:(ZKElement *)e NS_DESIGNATED_INITIALIZER;"
-    // )
     w.println("+(ZKComplexTypeInfo *)wsdlSchema;")
     w.println();
     val padTo = padMembersTo()
@@ -182,11 +178,11 @@ class ComplexTypeInfo(
             |    [self registerType:self xmlName:@"$xmlName"];
             |}
             |""".stripMargin('|'))
+    w.println()
   }
 
   protected def writeWsdlSchema(w: SourceWriter) {
-    w.println(s"""
-    |+(ZKComplexTypeInfo *)wsdlSchema {
+    w.println(s"""+(ZKComplexTypeInfo *)wsdlSchema {
     |   static ZKComplexTypeInfo *wsdlSchema;
     |   static dispatch_once_t onceToken;
     |   dispatch_once(&onceToken, ^{

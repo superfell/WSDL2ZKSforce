@@ -67,19 +67,26 @@ class ZKDescribeSObject(
     xmlName: String,
     objcName: String,
     xmlNode: Node,
-    fields: collection.Seq[ComplexTypeProperty]
-) extends ComplexTypeInfo(xmlName, objcName, xmlNode, fields, null) {
-
-  // TODO, should we just find ZKDescribeGlobalSObject and set it as the baseType ?
-
-  override def headerImportFile(): String = { "ZKDescribeGlobalSObject.h" }
-  override def baseClass(): String = { "ZKDescribeGlobalSObject" }
-  override protected def protocols(): Seq[String] = Seq()
-  override def classDepth(): Int = 2
+    fields: collection.Seq[ComplexTypeProperty],
+    baseType: TypeInfo
+) extends ComplexTypeInfo(xmlName, objcName, xmlNode, fields, baseType) {
 
   override protected def writeHeaderIVars(w: SourceWriter) {
     w.println("	NSDictionary *fieldsByName;")
     super.writeHeaderIVars(w)
+  }
+
+  override protected def writeWsdlSchema(w: SourceWriter) {
+    w.println(
+      "// This schema information reflects how ZKSforce maps DescribeSObject"
+    )
+    w.println(
+      "// into being a subclass of DescribeGlobalSObject, rather than"
+    )
+    w.println(
+      "// exactly how it is defined in the WSDL (where they are not related)."
+    )
+    super.writeWsdlSchema(w)
   }
 
   override protected def shouldWritePropertyImpls(
