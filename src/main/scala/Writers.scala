@@ -162,7 +162,7 @@ class BlockTypeDefStubWriter(allOperations: Seq[Operation])
 
     val pad = returnTypes.map(_.blockTypeName.length).max
     for (rt <- returnTypes.filter(_.objcName != "void"))
-      printBlockTypeDef(w, rt.blockTypeName, rt.fullTypeName, pad)
+      printBlockTypeDef(w, rt.blockTypeName, rt.fullTypeNameForBlock, pad)
 
     printBlockTypeDef(w, "ZKFailWithErrorBlock", "NSError *", pad)
     printBlockTypeDef(w, "ZKCompleteVoidBlock", "void", pad)
@@ -346,6 +346,7 @@ class BaseClientWriter(
     for (h <- headers)
       w.printClassForwardDecl(h.propType.objcName)
     val rts = collection.immutable.TreeSet.empty[String] ++ referencedTypes
+      .map(_.forwardDeclType())
       .filter(_.isGeneratedType)
       .map(_.objcName)
     for (t <- rts)

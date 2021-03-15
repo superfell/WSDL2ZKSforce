@@ -37,9 +37,6 @@ class TypeInfo(
     val isPointer: Boolean
 ) {
 
-  // additional comment that'll get added to a property declaration of this type.
-  def propertyDeclComment(): String = { "" }
-
   // what property flags should be used for this type.
   def propertyFlags(): String = {
     if (isPointer) "strong,nonatomic" else "assign,nonatomic"
@@ -49,8 +46,12 @@ class TypeInfo(
     fullTypeName.length
   }
 
+  def forwardDeclType(): TypeInfo = this
+
   // full name of the objective-c type, includes * for pointer types.
   def fullTypeName(): String = { if (isPointer) objcName + " *" else objcName }
+
+  def fullTypeNameForBlock(): String = fullTypeName()
 
   // returns true if this type is one we generated rather than a system type
   def isGeneratedType(): Boolean = { objcName.startsWith("ZK") } // TODO
@@ -85,9 +86,13 @@ class TypeInfo(
 class ArrayTypeInfo(val componentType: TypeInfo)
     extends TypeInfo(componentType.xmlName, "NSArray", "", true) {
 
-  override def propertyDeclComment(): String = {
-    " // of " + componentType.objcName
+  override def fullTypeName(): String = {
+    s"NSArray<${componentType.fullTypeName}> *"
   }
+
+  override def fullTypeNameForBlock(): String = "NSArray *"
+
+  override def forwardDeclType(): TypeInfo = componentType
 
   override def accessor(instanceName: String, elemName: String): String = {
     if (componentType.objcName == "NSString")

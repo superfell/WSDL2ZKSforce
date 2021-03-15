@@ -89,13 +89,16 @@ class ComplexTypeInfo(
   }
 
   protected def writeForwardDecls(w: SourceWriter) {
-    for (
-      t <- fields
-        .filter(_.propType.isGeneratedType)
-        .map(f => f.propType)
-        .distinct
-    ) {
+    val types = fields
+      .map(_.propType.forwardDeclType())
+      .filter(_.isGeneratedType)
+      .distinct
+
+    for (t <- types) {
       w.printClassForwardDecl(t.objcName)
+    }
+    if (types.length > 0) {
+      w.println()
     }
   }
 

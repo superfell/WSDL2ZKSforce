@@ -57,9 +57,8 @@ class ComplexTypeProperty(
 
   def propertyDecl(padTypeTo: Int): String = {
     val f = propType.propertyFlags
-    val comment = propType.propertyDeclComment
     val td = typeDef(padTypeTo)
-    s"@property ($f) $td; $comment"
+    s"@property ($f) $td;"
   }
 
   def propertyValDecl(padTypeTo: Int): String = {
@@ -78,12 +77,15 @@ class ComplexTypeProperty(
   }
 
   private def typeDef(padTypeTo: Int): String = {
-    val t = propType.objcName.padTo(
-      padTypeTo - (if (propType.isPointer) 1 else 0),
-      ' '
-    )
-    val p = if (propType.isPointer) "*" else ""
-    s"$t$p$propertyName"
+    var t = propType.fullTypeName()
+    if (t.endsWith("*")) {
+      t = t.stripSuffix("*")
+      t = t.padTo(padTypeTo - 1, ' ')
+      t = t + "*"
+    } else {
+      t = t.padTo(padTypeTo, ' ')
+    }
+    s"$t$propertyName"
   }
 
   override def equals(other: Any): Boolean = {
