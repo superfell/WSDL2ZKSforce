@@ -225,14 +225,15 @@ class ComplexTypeInfo(
           |    }
           |    return self.${f.propertyName}__v;
           |}
-          """.stripMargin('|'))
+          |""".stripMargin('|'))
         // property setter
         w.println(s"""
           |-(void)${f.propertySetterName}:(${f.propType.fullTypeName})v {
           |    self.${f.propertyName}__v = v;
           |    ${psMgr.variable} |= ${psMgr.bitMask}; 
           |}
-          """.stripMargin('|'))
+          |""".stripMargin('|'))
+        w.println()
       }
     }
   }
