@@ -212,29 +212,28 @@ class ComplexTypeInfo(
 
   protected def writePropertyImpls(w: SourceWriter) {
     for ((f, fIdx) <- fields.zipWithIndex) {
-      if (!shouldWritePropertyImpls(f)) {
-        return
-      }
-      // property getter
-      val psMgr = new PropertySetManger(classDepth(), fIdx, fields.size)
+      if (shouldWritePropertyImpls(f)) {
+        // property getter
+        val psMgr = new PropertySetManger(classDepth(), fIdx, fields.size)
 
-      val accessor = f.propType.accessor("self", f.elementName)
-      w.println(s"""
-        |-(${f.propType.fullTypeName})${f.propertyName} {
-        |    if ((${psMgr.variable} & ${psMgr.bitMask}) == 0) {
-        |        self.${f.propertyName}__v = ${accessor};
-        |        ${psMgr.variable} |= ${psMgr.bitMask}; 
-        |    }
-        |    return self.${f.propertyName}__v;
-        |}
-        """.stripMargin('|'))
-      // property setter
-      w.println(s"""
-        |-(void)${f.propertySetterName}:(${f.propType.fullTypeName})v {
-        |    self.${f.propertyName}__v = v;
-        |    ${psMgr.variable} |= ${psMgr.bitMask}; 
-        |}
-        """.stripMargin('|'))
+        val accessor = f.propType.accessor("self", f.elementName)
+        w.println(s"""
+          |-(${f.propType.fullTypeName})${f.propertyName} {
+          |    if ((${psMgr.variable} & ${psMgr.bitMask}) == 0) {
+          |        self.${f.propertyName}__v = ${accessor};
+          |        ${psMgr.variable} |= ${psMgr.bitMask}; 
+          |    }
+          |    return self.${f.propertyName}__v;
+          |}
+          """.stripMargin('|'))
+        // property setter
+        w.println(s"""
+          |-(void)${f.propertySetterName}:(${f.propType.fullTypeName})v {
+          |    self.${f.propertyName}__v = v;
+          |    ${psMgr.variable} |= ${psMgr.bitMask}; 
+          |}
+          """.stripMargin('|'))
+      }
     }
   }
 
