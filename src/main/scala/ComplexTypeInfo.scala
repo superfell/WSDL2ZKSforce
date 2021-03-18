@@ -221,7 +221,7 @@ class ComplexTypeInfo(
           |-(${f.propType.fullTypeName})${f.propertyName} {
           |    if ((${psMgr.variable} & ${psMgr.bitMask}) == 0) {
           |        self.${f.propertyName}__v = ${accessor};
-          |        ${psMgr.variable} |= ${psMgr.bitMask}; 
+          |        ${psMgr.variable} |= ${psMgr.bitMask};
           |    }
           |    return self.${f.propertyName}__v;
           |}
@@ -230,7 +230,7 @@ class ComplexTypeInfo(
         w.println(s"""
           |-(void)${f.propertySetterName}:(${f.propType.fullTypeName})v {
           |    self.${f.propertyName}__v = v;
-          |    ${psMgr.variable} |= ${psMgr.bitMask}; 
+          |    ${psMgr.variable} |= ${psMgr.bitMask};
           |}
           |""".stripMargin('|'))
         w.println()
