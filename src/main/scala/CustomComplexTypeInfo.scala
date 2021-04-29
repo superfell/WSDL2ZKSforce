@@ -101,12 +101,16 @@ class ZKDescribeSObject(
     |		NSArray *fa = [self complexTypeArrayFromElements:@"fields" cls:[ZKDescribeField class]];
     |		for (ZKDescribeField *f in fa) {
     |			f.sobject = self;
-    |       }
+    |   }
     |		self.fields__v = fa;
-	|	}
+	  |	}
     |	return self.fields__v;
-	|}
-	|""".stripMargin('|'))
+    |}
+    |
+    |-(void)setFields:(NSArray *)v {
+    |    self.fields__v = v;
+    |}
+    |""".stripMargin('|'))
     super.writePropertyImpls(w)
   }
 }

@@ -1,5 +1,4 @@
-WSDL2ZKSforce
-=============
+# WSDL2ZKSforce
 
 Code generator for ZKSforce
 
@@ -8,3 +7,5 @@ This is a scala script that generates code for inclusion with ZKSforce from the 
 You do NOT need to use this if you want to use ZKSforce, just grab ZKSforce and go, this is just used to update it to newer API versions as they are released.
 
 The script assumes that both WSDL2ZKSforce and ZKSforce are checked out to peer directories.
+
+run with `sbt run`
